@@ -1,0 +1,339 @@
+
+> tauri-app@0.1.0 tauri
+> tauri dev
+
+     Running BeforeDevCommand (`npm run dev`)
+     Running DevCommand (`cargo  run --no-default-features --color always --`)
+        Info Watching C:\Users\u\OneDrive\devel\Antigravity\Projects\yats\src-tauri for changes...
+
+> tauri-app@0.1.0 dev
+> vite
+
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.34s
+     Running `C:/Users/u/cargo_targets/yats\debug\yats.exe`
+HID Monitor window created: 0xe0f1c
+
+[[HID_SCAN_START]] Found 23 raw input devices:
+  [[DEVICE]] hDevice=0x4590edb, type=HID, name=\\?\HID#VID_056E&PID_0131&MI_02#8&a4fcb00&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}, page=0xFF01, usage=0x0001
+  [[DEVICE]] hDevice=0x29ce0f0d, type=HID, name=\\?\HID#VID_056E&PID_0131&MI_00&Col03#8&1c3e67d&0&0002#{4d1e55b2-f16f-11cf-88cb-001111000030}, page=0x000C, usage=0x0001
+  [[DEVICE]] hDevice=0x5d90f6f, type=Keyboard, name=\\?\HID#VID_056E&PID_0131&MI_01#8&22135745&0&0000#{884b96c3-56ef-11d1-bc8c-00a0c91405dd}, page=0x0000, usage=0x0000
+  [[DEVICE]] hDevice=0x17e05cb, type=Mouse, name=\\?\HID#VID_056E&PID_0131&MI_00&Col01#8&1c3e67d&0&0000#{378de44c-56ef-11d1-bc8c-00a0c91405dd}, page=0x0000, usage=0x0000
+  [[DEVICE]] hDevice=0x41f0f3d, type=HID, name=\\?\HID#VID_3434&PID_0222&MI_02&Col03#8&3c63413&0&0002#{4d1e55b2-f16f-11cf-88cb-001111000030}, page=0x000C, usage=0x0001
+  [[DEVICE]] hDevice=0x142d0109, type=Keyboard, name=\\?\HID#VID_3434&PID_0222&MI_02&Col04#8&3c63413&0&0003#{884b96c3-56ef-11d1-bc8c-00a0c91405dd}, page=0x0000, usage=0x0000
+  [[DEVICE]] hDevice=0x35c0ebf, type=HID, name=\\?\HID#VID_3434&PID_0222&MI_01#8&201109af&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}, page=0xFF60, usage=0x0061
+  [[DEVICE]] hDevice=0x15290419, type=Mouse, name=\\?\HID#VID_3434&PID_0222&MI_02&Col01#8&3c63413&0&0000#{378de44c-56ef-11d1-bc8c-00a0c91405dd}, page=0x0000, usage=0x0000
+  [[DEVICE]] hDevice=0x2b90f83, type=Keyboard, name=\\?\HID#VID_3434&PID_0222&MI_00#8&84d7d6a&0&0000#{884b96c3-56ef-11d1-bc8c-00a0c91405dd}, page=0x0000, usage=0x0000
+  [[DEVICE]] hDevice=0x500fd, type=HID, name=\\?\Microsoft HID RID\000D_0002\0, page=0x000D, usage=0x0002
+  [[DEVICE]] hDevice=0x1013d, type=HID, name=\\?\HID#VID_0B05&PID_1996&MI_07#7&1b144f70&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}, page=0xFFC0, usage=0x0001
+  [[DEVICE]] hDevice=0x1009d, type=HID, name=\\?\HID#VID_056A&PID_0084&Col04#8&52643bb&0&0003#{4d1e55b2-f16f-11cf-88cb-001111000030}, page=0x000D, usage=0x0001
+  [[DEVICE]] hDevice=0x1009b, type=HID, name=\\?\HID#ElcVirtualBus#2&14c099a0&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}, page=0xFF10, usage=0x0001
+  [[DEVICE]] hDevice=0x10097, type=HID, name=\\?\HID#VID_056A&PID_0084&Col03#8&52643bb&0&0002#{4d1e55b2-f16f-11cf-88cb-001111000030}, page=0x000D, usage=0x0002
+  [[DEVICE]] hDevice=0x10093, type=HID, name=\\?\HID#VID_056A&PID_0084&Col02#8&52643bb&0&0001#{4d1e55b2-f16f-11cf-88cb-001111000030}, page=0xFF00, usage=0x000A
+  [[DEVICE]] hDevice=0x10091, type=HID, name=\\?\HID#ElcVirtualBus#2&206e8fb&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}, page=0x000C, usage=0x0001
+  [[DEVICE]] hDevice=0x1008d, type=HID, name=\\?\HID#VID_0C76&PID_161D&MI_02#8&13445d29&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}, page=0x000C, usage=0x0001
+  [[DEVICE]] hDevice=0x1008b, type=HID, name=\\?\HID#VID_056A&PID_0084&Col06#8&52643bb&0&0005#{4d1e55b2-f16f-11cf-88cb-001111000030}, page=0xFF01, usage=0x0080
+  [[DEVICE]] hDevice=0x10089, type=HID, name=\\?\HID#VID_0B05&PID_19AF&MI_02#7&382c88b3&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}, page=0xFF72, usage=0x00A1
+  [[DEVICE]] hDevice=0x10087, type=HID, name=\\?\HID#VID_056A&PID_0084&Col05#8&52643bb&0&0004#{4d1e55b2-f16f-11cf-88cb-001111000030}, page=0xFF00, usage=0x000B
+  [[DEVICE]] hDevice=0x10067, type=Mouse, name=\\?\HID#ElcVirtualBus#2&182e51b8&0&0000#{378de44c-56ef-11d1-bc8c-00a0c91405dd}, page=0x0000, usage=0x0000
+  [[DEVICE]] hDevice=0x10062, type=Mouse, name=\\?\HID#VID_056A&PID_0084&Col01#8&52643bb&0&0000#{378de44c-56ef-11d1-bc8c-00a0c91405dd}, page=0x0000, usage=0x0000
+  [[DEVICE]] hDevice=0x10049, type=Keyboard, name=\\?\HID#ElcVirtualBus#2&2ae8025d&0&0000#{884b96c3-56ef-11d1-bc8c-00a0c91405dd}, page=0x0000, usage=0x0000
+[[HID_SCAN_END]]
+
+Raw Input Devices (Kbd, Mouse, Pointer, Digitizers) registered successfully.
+error when starting dev server:
+Error: Port 1420 is already in use
+    at Server.onError$1 (file:///C:/Users/u/OneDrive/devel/Antigravity/Projects/yats/node_modules/vite/dist/node/chunks/config.js:14933:28)
+    at Server.emit (node:events:508:28)
+    at emitErrorNT (node:net:1976:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+       Error The "beforeDevCommand" terminated with a non-zero status code.
+Setup: Emitting diagnostic ping...
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=-1
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-4, lastY=-6
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-6, lastY=-12
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-11, lastY=-21
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-13, lastY=-29
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-15, lastY=-32
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-13, lastY=-37
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-13, lastY=-40
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-10, lastY=-40
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-10, lastY=-36
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-9, lastY=-32
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-9, lastY=-25
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-10, lastY=-19
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-9, lastY=-14
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-8, lastY=-11
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-7, lastY=-10
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-7, lastY=-9
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-6, lastY=-8
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-5, lastY=-6
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-4, lastY=-4
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-1, lastY=-1
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=1, lastY=0
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=1, lastY=1
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=2, lastY=3
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=2, lastY=2
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=1
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=-4
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-3, lastY=-8
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-6, lastY=-14
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-8, lastY=-19
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-13, lastY=-20
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-14, lastY=-21
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-17, lastY=-19
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-18, lastY=-16
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-18, lastY=-13
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-16, lastY=-12
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-14, lastY=-10
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-11, lastY=-9
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-7, lastY=-7
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-5, lastY=-6
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-5, lastY=-4
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-3, lastY=-3
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-2, lastY=-2
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-1, lastY=-2
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=-2
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-1, lastY=0
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=-1
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-1, lastY=-1
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-4, lastY=-6
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-7, lastY=-7
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-8, lastY=-10
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-9, lastY=-9
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-10, lastY=-8
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-9, lastY=-8
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-7, lastY=-7
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-6, lastY=-7
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-5, lastY=-8
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-4, lastY=-8
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-4, lastY=-8
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-3, lastY=-9
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-4, lastY=-8
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-3, lastY=-8
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-4, lastY=-6
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-2, lastY=-4
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-2, lastY=-4
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-2, lastY=-3
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-1, lastY=-3
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-1, lastY=-2
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=-2
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-1, lastY=-1
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=-1
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-1, lastY=-1
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=-1
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=-1
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0001, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-1, lastY=0
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0002, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=2
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=3
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=8
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=-1, lastY=7
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=6
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=7
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=8
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=1, lastY=9
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=1, lastY=10
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=3, lastY=11
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=5, lastY=11
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=4, lastY=11
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=4, lastY=11
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=4, lastY=10
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=5, lastY=10
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=4, lastY=10
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=4, lastY=9
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=4, lastY=8
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=4, lastY=6
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=3, lastY=4
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=4, lastY=2
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=3, lastY=1
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=3, lastY=0
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=2, lastY=0
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=2, lastY=0
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=1, lastY=0
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=-1
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=1, lastY=0
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=1, lastY=4
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=4, lastY=5
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=5, lastY=7
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=7, lastY=7
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=6, lastY=6
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=6, lastY=5
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=6, lastY=5
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=6, lastY=4
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=5, lastY=3
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=5, lastY=2
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=5, lastY=2
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=4, lastY=2
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=4, lastY=2
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=4, lastY=1
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=3, lastY=0
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=2, lastY=0
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=1, lastY=0
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=2, lastY=0
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=3, lastY=2
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=4, lastY=5
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=8, lastY=6
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=9, lastY=6
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=12, lastY=6
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=12, lastY=5
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=12, lastY=6
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=12, lastY=5
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=10, lastY=7
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=9, lastY=6
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=8, lastY=6
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=7, lastY=7
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=5, lastY=7
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=5, lastY=7
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=4, lastY=6
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=3, lastY=5
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=3, lastY=4
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=1, lastY=2
+!!! [WM_INPUT] handle=0x17e05cb, type=Mouse, flags=0x0000, buttons=0x0000, lastX=0, lastY=0
+!!! [WM_INPUT] handle=0x10067, type=Mouse, flags=0x0000, buttons=0x0000, lastX=1, lastY=2
+Backend: Heartbeat Ping emitted.
+Backend: Heartbeat Ping emitted.
+Backend: Heartbeat Ping emitted.

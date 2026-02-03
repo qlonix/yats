@@ -1,0 +1,43 @@
+**********************************************************************
+** Visual Studio 2026 Developer Command Prompt v18.2.1
+** Copyright (c) 2025 Microsoft Corporation
+**********************************************************************
+[DEBUG:ext\vcvars.bat] Found potential v145 version file: 'Microsoft.VCToolsVersion.VC.14.50.18.0.txt'
+[DEBUG:ext\vcvars.bat] Testing v145 version file: 'Microsoft.VCToolsVersion.VC.14.50.18.0.txt'
+    Checking yats v0.1.0 (C:\Users\u\OneDrive\devel\Antigravity\Projects\yats\src-tauri)
+error[E0433]: failed to resolve: use of undeclared type `Arc`
+  --> src\lib.rs:14:19
+   |
+14 |     let monitor = Arc::new(TouchpadMonitor::new());
+   |                   ^^^ use of undeclared type `Arc`
+   |
+help: consider importing this struct
+   |
+ 4 + use std::sync::Arc;
+   |
+
+error[E0433]: failed to resolve: use of undeclared type `Arc`
+  --> src\lib.rs:15:25
+   |
+15 |     let monitor_clone = Arc::clone(&monitor);
+   |                         ^^^ use of undeclared type `Arc`
+   |
+help: consider importing this struct
+   |
+ 4 + use std::sync::Arc;
+   |
+
+warning: unused imports: `Runtime` and `TrayIconEvent`
+ --> src\lib.rs:6:29
+  |
+6 |     tray::{TrayIconBuilder, TrayIconEvent},
+  |                             ^^^^^^^^^^^^^
+7 |     Manager, Runtime,
+  |              ^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+For more information about this error, try `rustc --explain E0433`.
+warning: `yats` (lib) generated 1 warning
+error: could not compile `yats` (lib) due to 2 previous errors; 1 warning emitted
+

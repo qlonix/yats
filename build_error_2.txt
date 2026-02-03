@@ -1,0 +1,31 @@
+
+> tauri-app@0.1.0 tauri
+> tauri build
+
+        Info Looking up installed tauri packages to check mismatched versions...
+        Warn The bundle identifier "com.yats.app" set in `tauri.conf.json identifier` ends with `.app`. This is not recommended because it conflicts with the application bundle extension on macOS.
+     Running beforeBuildCommand `npm run build`
+
+> tauri-app@0.1.0 build
+> vite build
+
+[36mvite v7.3.1 [32mbuilding client environment for production...[36m[39m
+transforming...
+[32m笨・[39m 32 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mdist/[22m[32mindex.html                 [39m[1m[2m  0.48 kB[22m[1m[22m[2m 笏・gzip:  0.30 kB[22m
+[2mdist/[22m[35massets/index-C11sqiGx.css  [39m[1m[2m  5.63 kB[22m[1m[22m[2m 笏・gzip:  1.90 kB[22m
+[2mdist/[22m[36massets/index-D_DRVa1s.js   [39m[1m[2m198.99 kB[22m[1m[22m[2m 笏・gzip: 62.70 kB[22m
+[32m笨・built in 476ms[39m
+   Compiling yats v0.1.0 (C:\Users\u\OneDrive\devel\Antigravity\Projects\yats\src-tauri)
+error[E0599]: no variant named `MouseMoveLocal` found for enum `EventType`
+  --> src\keyboard_hook.rs:69:58
+   |
+69 |                 EventType::MouseMove { .. } | EventType::MouseMoveLocal { .. } => false,
+   |                                                          ^^^^^^^^^^^^^^ variant not found in `EventType`
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `yats` (lib) due to 1 previous error
+failed to build app: failed to build app
+       Error failed to build app: failed to build app

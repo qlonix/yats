@@ -1,0 +1,294 @@
+use crate::audit_log;
+use std::collections::HashMap;
+use std::ptr::null_mut;
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, Ordering};
+use std::sync::{Arc, Mutex};
+use tauri::{AppHandle, Emitter};
+use winapi::shared::windef::HWND;
+use winapi::um::libloaderapi::GetModuleHandleW;
+use winapi::um::winuser::{
+    CreateWindowExW, DefWindowProcW, GetRawInputData, RegisterClassW, RegisterRawInputDevices,
+    HRAWINPUT, RAWINPUT, RAWINPUTDEVICE, RAWINPUTHEADER, RID_INPUT, RIM_TYPEHID, RIM_TYPEMOUSE,
+    WM_INPUT, WNDCLASSW,
+};
+
+#[derive(Clone, Copy)]
+struct SendHwnd(HWND);
+unsafe impl Send for SendHwnd {}
+unsafe impl Sync for SendHwnd {}
+
+pub struct MonitorState {
+    pub is_touched: AtomicBool,
+    pub last_touch_time: Mutex<std::time::Instant>,
+    pub x_delta: AtomicI32,
+    pub y_delta: AtomicI32,
+    pub release_delay_ms: AtomicU32,
+    pub app_handle: Arc<Mutex<Option<AppHandle>>>,
+    hwnd: Mutex<Option<SendHwnd>>,
+    pub device_activity: Mutex<HashMap<usize, u32>>, // id -> count
+    pub locked_device: Mutex<Option<usize>>,
+}
+
+pub struct TouchpadMonitor {
+    pub state: Arc<MonitorState>,
+}
+
+impl TouchpadMonitor {
+    pub fn new(app_handle: Arc<Mutex<Option<AppHandle>>>) -> Self {
+        let state = Arc::new(MonitorState {
+            is_touched: AtomicBool::new(false),
+            last_touch_time: Mutex::new(
+                std::time::Instant::now() - std::time::Duration::from_secs(10),
+            ),
+            x_delta: AtomicI32::new(0),
+            y_delta: AtomicI32::new(0),
+            release_delay_ms: AtomicU32::new(200), // Default to 200ms
+            app_handle,
+            hwnd: Mutex::new(None),
+            device_activity: Mutex::new(HashMap::new()),
+            locked_device: Mutex::new(None),
+        });
+
+        let state_clone = Arc::clone(&state);
+        std::thread::spawn(move || {
+            Self::run_monitor(state_clone);
+        });
+
+        let state_watch = Arc::clone(&state);
+        std::thread::spawn(move || loop {
+            std::thread::sleep(std::time::Duration::from_millis(100)); // More frequent check for responsive delay
+
+            if let Ok(h) = state_watch.app_handle.try_lock() {
+                if let Some(app) = &*h {
+                    let _ = app.emit("monitor-heartbeat", true).ok();
+
+                    let activity = { state_watch.device_activity.lock().unwrap().clone() };
+                    let mut sorted: Vec<_> = activity.into_iter().collect();
+                    sorted.sort_by(|a, b| b.1.cmp(&a.1));
+                    let top: Vec<String> = sorted
+                        .iter()
+                        .take(5)
+                        .map(|(id, count)| format!("0x{:x} ({})", id, count))
+                        .collect();
+                    let _ = app.emit("top-devices", top).ok();
+                }
+            }
+
+            let last_touch = { *state_watch.last_touch_time.lock().unwrap() };
+            let delay = state_watch.release_delay_ms.load(Ordering::SeqCst) as u64;
+
+            if std::time::Instant::now()
+                .duration_since(last_touch)
+                .as_millis()
+                > delay as u128
+            {
+                if state_watch.is_touched.swap(false, Ordering::SeqCst) {
+                    if let Ok(h) = state_watch.app_handle.try_lock() {
+                        if let Some(app) = &*h {
+                            let _ = app.emit("touchpad-status", false).ok();
+                        }
+                    }
+                }
+            }
+        });
+
+        Self { state }
+    }
+
+    pub fn scan_and_register(&self) {
+        unsafe {
+            let hwnd_wrapped = { *self.state.hwnd.lock().unwrap() };
+            let hwnd = match hwnd_wrapped {
+                Some(h) => h.0,
+                None => return,
+            };
+
+            let mut unique_pairs = std::collections::HashSet::new();
+            unique_pairs.insert((0x01, 0x02)); // Mouse
+                                               // unique_pairs.insert((0x01, 0x06)); // KEYBOARD (Diagnostic!) - REMOVED to prevent self-trigger
+            unique_pairs.insert((0x0D, 0x04)); // Touch Screen
+            unique_pairs.insert((0x0D, 0x05)); // Touch Pad
+
+            audit_log("[MONITOR] Registering for Raw Input");
+
+            let mut rids = Vec::new();
+            for (p, u) in unique_pairs {
+                rids.push(RAWINPUTDEVICE {
+                    usUsagePage: p,
+                    usUsage: u,
+                    dwFlags: winapi::um::winuser::RIDEV_INPUTSINK,
+                    hwndTarget: hwnd,
+                });
+            }
+            if RegisterRawInputDevices(
+                rids.as_ptr(),
+                rids.len() as u32,
+                std::mem::size_of::<RAWINPUTDEVICE>() as u32,
+            ) == 0
+            {
+                audit_log("[MONITOR] FAILED to register Raw Input Devices!");
+            } else {
+                audit_log("[MONITOR] Successfully registered Raw Input Devices");
+            }
+        }
+    }
+
+    pub fn lock_device(&self, device_id: Option<usize>) {
+        *self.state.locked_device.lock().unwrap() = device_id;
+        audit_log(&format!("[MONITOR] Locked to device: {:?}", device_id));
+    }
+
+    pub fn is_touched(&self) -> bool {
+        self.state.is_touched.load(Ordering::SeqCst)
+    }
+
+    pub fn consume_y_delta(&self) -> i32 {
+        self.state.y_delta.swap(0, Ordering::SeqCst)
+    }
+
+    fn run_monitor(state: Arc<MonitorState>) {
+        unsafe {
+            let h_instance = GetModuleHandleW(null_mut());
+            let class_name: Vec<u16> = "TouchpadMonitorClass\0".encode_utf16().collect();
+            let wnd_class = WNDCLASSW {
+                style: 0,
+                lpfnWndProc: Some(Self::wnd_proc),
+                cbClsExtra: 0,
+                cbWndExtra: 0,
+                hInstance: h_instance,
+                hIcon: null_mut(),
+                hCursor: null_mut(),
+                hbrBackground: null_mut(),
+                lpszMenuName: null_mut(),
+                lpszClassName: class_name.as_ptr(),
+            };
+            RegisterClassW(&wnd_class);
+
+            let hwnd = CreateWindowExW(
+                0,
+                class_name.as_ptr(),
+                class_name.as_ptr(),
+                0,
+                0,
+                0,
+                0,
+                0,
+                null_mut(),
+                null_mut(),
+                h_instance,
+                null_mut(),
+            );
+
+            if hwnd.is_null() {
+                return;
+            }
+            {
+                *state.hwnd.lock().unwrap() = Some(SendHwnd(hwnd));
+            }
+
+            winapi::um::winuser::SetWindowLongPtrW(
+                hwnd,
+                winapi::um::winuser::GWLP_USERDATA,
+                Arc::into_raw(Arc::clone(&state)) as isize,
+            );
+
+            // Trigger mapping scan immediately after window creation
+            let s_ptr = Arc::into_raw(Arc::clone(&state));
+            let s = Arc::from_raw(s_ptr);
+            let m = TouchpadMonitor { state: s };
+            m.scan_and_register();
+
+            let mut msg = std::mem::zeroed();
+            while winapi::um::winuser::GetMessageW(&mut msg, null_mut(), 0, 0) != 0 {
+                winapi::um::winuser::TranslateMessage(&msg);
+                winapi::um::winuser::DispatchMessageW(&msg);
+            }
+        }
+    }
+
+    unsafe extern "system" fn wnd_proc(
+        hwnd: HWND,
+        msg: u32,
+        wparam: usize,
+        lparam: isize,
+    ) -> isize {
+        if msg == WM_INPUT {
+            let mut dw_size: u32 = 0;
+            GetRawInputData(
+                lparam as HRAWINPUT,
+                RID_INPUT,
+                null_mut(),
+                &mut dw_size,
+                std::mem::size_of::<RAWINPUTHEADER>() as u32,
+            );
+            let mut buffer = vec![0u8; dw_size as usize];
+            if GetRawInputData(
+                lparam as HRAWINPUT,
+                RID_INPUT,
+                buffer.as_mut_ptr() as *mut _,
+                &mut dw_size,
+                std::mem::size_of::<RAWINPUTHEADER>() as u32,
+            ) == dw_size
+            {
+                let raw = &*(buffer.as_ptr() as *const RAWINPUT);
+                let state_ptr = winapi::um::winuser::GetWindowLongPtrW(
+                    hwnd,
+                    winapi::um::winuser::GWLP_USERDATA,
+                ) as *mut MonitorState;
+
+                if !state_ptr.is_null() {
+                    let state = &*state_ptr;
+                    let mut event_detected = false;
+                    let device_id = raw.header.hDevice as usize;
+
+                    {
+                        let mut activity = state.device_activity.lock().unwrap();
+                        let count = activity.entry(device_id).or_insert(0);
+                        *count += 1;
+                    }
+
+                    let locked = { *state.locked_device.lock().unwrap() };
+                    if let Some(target) = locked {
+                        if device_id != target {
+                            return DefWindowProcW(hwnd, msg, wparam, lparam);
+                        }
+                    }
+
+                    // Filter out injected inputs (hDevice == 0 usually indicates SendInput)
+                    // This prevents self-loops where our simulated actions trigger the monitor
+                    if raw.header.hDevice.is_null() {
+                        return DefWindowProcW(hwnd, msg, wparam, lparam);
+                    }
+
+                    if raw.header.dwType == RIM_TYPEMOUSE {
+                        let m = raw.data.mouse();
+                        // Only count as "Touched" if there is ACTUAL movement or button press.
+                        // Ignore usFlags or other metadata that might spark noise.
+                        if m.lLastX != 0 || m.lLastY != 0 || m.ulRawButtons != 0 {
+                            event_detected = true;
+                            state.x_delta.fetch_add(m.lLastX, Ordering::SeqCst);
+                            state.y_delta.fetch_add(-m.lLastY, Ordering::SeqCst);
+                        }
+                    } else if raw.header.dwType == RIM_TYPEHID {
+                        // For HID (Touchpad/Digitizer), we assume any report implies activity
+                        // But we should be careful.
+                        event_detected = true;
+                    }
+
+                    if event_detected {
+                        state.is_touched.store(true, Ordering::SeqCst);
+                        if let Ok(mut last_time) = state.last_touch_time.lock() {
+                            *last_time = std::time::Instant::now();
+                        }
+                        if let Ok(h) = state.app_handle.try_lock() {
+                            if let Some(app) = &*h {
+                                let _ = app.emit("touchpad-status", true).ok();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        DefWindowProcW(hwnd, msg, wparam, lparam)
+    }
+}

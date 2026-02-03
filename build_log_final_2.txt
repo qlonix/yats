@@ -1,0 +1,63 @@
+**********************************************************************
+** Visual Studio 2026 Developer Command Prompt v18.2.1
+** Copyright (c) 2025 Microsoft Corporation
+**********************************************************************
+[DEBUG:ext\vcvars.bat] Found potential v145 version file: 'Microsoft.VCToolsVersion.VC.14.50.18.0.txt'
+[DEBUG:ext\vcvars.bat] Testing v145 version file: 'Microsoft.VCToolsVersion.VC.14.50.18.0.txt'
+   Compiling vswhom-sys v0.1.3
+   Compiling vswhom v0.1.0
+   Compiling embed-resource v3.0.6
+   Compiling tauri-winres v0.3.5
+   Compiling tauri-build v2.5.3
+   Compiling tauri v2.9.5
+   Compiling yats v0.1.0 (C:\Users\u\OneDrive\devel\Antigravity\Projects\yats\src-tauri)
+   Compiling tauri-plugin-opener v2.5.3
+error[E0432]: unresolved import `rdev::grab`
+   --> src\keyboard_hook.rs:2:12
+    |
+  2 | use rdev::{grab, Event, EventType, Key};
+    |            ^^^^ no `grab` in the root
+    |
+note: found an item that was configured out
+   --> C:\Users\u\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\rdev-0.5.3\src\lib.rs:360:8
+    |
+333 | #[cfg(any(feature = "unstable_grab"))]
+    |          --------------------------- the item is gated here
+...
+360 | pub fn grab<T>(callback: T) -> Result<(), GrabError>
+    |        ^^^^
+
+warning: unused imports: `GET_RAWINPUT_CODE_WPARAM` and `RIDEV_DEVNOTIFY`
+ --> src\touchpad_monitor.rs:4:63
+  |
+4 |     RegisterRawInputDevices, RAWINPUTDEVICE, RIDEV_INPUTSINK, RIDEV_DEVNOTIFY,
+  |                                                               ^^^^^^^^^^^^^^^
+5 |     WM_INPUT, GET_RAWINPUT_CODE_WPARAM, RID_INPUT, GetRawInputData, RAWINPUTHEADER,
+  |               ^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `MenuItem`, `Menu`, `Runtime`, `TrayIconBuilder`, and `TrayIconEvent`
+ --> src\lib.rs:6:12
+  |
+6 |     menu::{Menu, MenuItem},
+  |            ^^^^  ^^^^^^^^
+7 |     tray::{TrayIconBuilder, TrayIconEvent},
+  |            ^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^
+8 |     Runtime,
+  |     ^^^^^^^
+
+warning: variable does not need to be mutable
+  --> src\touchpad_monitor.rs:71:17
+   |
+71 |             let mut rid = RAWINPUTDEVICE {
+   |                 ----^^^
+   |                 |
+   |                 help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+For more information about this error, try `rustc --explain E0432`.
+warning: `yats` (lib) generated 3 warnings
+error: could not compile `yats` (lib) due to 1 previous error; 3 warnings emitted
+
