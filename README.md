@@ -1,7 +1,29 @@
-# Tauri + React
+# YATS (Yet Another Touchpad Shortcut)
 
-This template should help get you started developing with Tauri and React in Vite.
+**YATS** stands for **Yet Another Touchpad Shortcut**. 
 
-## Recommended IDE Setup
+It is a Windows utility application designed to enhance your productivity by allowing you to trigger custom shortcuts, macros, and system actions directly via your touchpad. By mapping specific keys to touchpad-monitored gestures, you can perform complex tasks without ever taking your hands off the tracking surface.
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+## Features
+
+- **Touchpad Triggers**: Map regions of your touchpad or specific gestures to actions.
+- **Customizable Actions**:
+  - Mouse Clicks (Left, Right, Middle, Double Click)
+  - Keyboard Macros
+  - Window Management (Close, Maximize/Restore, Move)
+  - Scrolling (Logarithmic sensitivity control)
+- **Advanced Logic**:
+  - **Safety Guard**: Prevents accidental triggers when typing or using the mouse.
+  - **Smart Drag**: Seamless drag-and-drop support.
+  - **Scroll Smoothing**: High-resolution scroll injection for a native feel.
+- **System Integration**:
+  - Run on Startup
+  - System Tray control (Pause/Resume)
+
+## Development
+
+This project is developed solely by **Antigravity**.
+
+## License
+
+[MIT](LICENSE)
