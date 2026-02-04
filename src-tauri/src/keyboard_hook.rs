@@ -222,23 +222,25 @@ impl HookWorker {
                         delta = -delta;
                     }
 
-                    // 加速 (対数的)
-                    // 加速ONの場合、符号を維持して二乗またはブースト
-                    let mut scale = cfg.sensitivity as i32;
+                    // Linear Smooth Scroll (v1.0.1 Fix)
+                    // 以前の計算 (delta * sensitivty / 10) は倍率が高すぎて (10倍)、
+                    // 加速のように感じられた可能性があります。
+                    // より穏やかで、リニアなスケーリングに変更します。
+                    // Sensitivity 100 = 2.5x Multiplier (100 / 40)
+                    let scale = cfg.sensitivity as i32;
+                    let mut scaled_delta = (delta * scale) / 40;
+
+                    // 加速が有効な場合のみブースト (ユーザー設定がONの場合)
                     if cfg.acceleration {
-                        // 単純加速: 大きさ * 感度 * ブースト
-                        // または非線形で感度をブースト
-                        // 標準加速は高速移動時により高い倍率がかかると仮定
                         if delta.abs() > 5 {
-                            scale *= 2;
+                            scaled_delta *= 2;
                         }
                     }
 
-                    // 標準スケーリング
-                    // 基本感度 100 = 1.0倍
-                    // 200 = 2.0倍 など
-                    // 100で割って正規化
-                    let scaled_delta = (delta * scale) / 10;
+                    // 最小値保証 (動きが小さすぎて0にならないように)
+                    if delta != 0 && scaled_delta == 0 {
+                        scaled_delta = if delta > 0 { 1 } else { -1 };
+                    }
 
                     if scaled_delta != 0 {
                         send_mouse_scroll(scaled_delta);

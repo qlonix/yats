@@ -372,7 +372,7 @@ function App() {
             <h2>About YATS</h2>
             <p><strong>YATS</strong> stands for:</p>
             <p className="yats-full-name">Yet Another Touchpad Shortcut</p>
-            <p className="version-info">Version 1.0.0</p>
+            <p className="version-info">Version 1.0.1</p>
             <button className="btn-close-modal" onClick={() => setShowAbout(false)}>Close</button>
           </div>
         </div>
@@ -402,7 +402,7 @@ function App() {
 
       <header>
         <div className="title-group">
-          <h1>YATS Settings v1.0.0 <span className="about-link" onClick={() => setShowAbout(true)}>?</span></h1>
+          <h1>YATS Settings v1.0.1 <span className="about-link" onClick={() => setShowAbout(true)}>?</span></h1>
           <div className="header-controls">
             <label className="header-control-item">
               <input type="checkbox" checked={autoStart} onChange={toggleAutoStart} />
