@@ -25,7 +25,7 @@ pub struct MonitorState {
     pub release_delay_ms: AtomicU32,
     pub app_handle: Arc<Mutex<Option<AppHandle>>>,
     hwnd: Mutex<Option<SendHwnd>>,
-    pub device_activity: Mutex<HashMap<usize, u32>>, // id -> count
+    pub device_activity: Mutex<HashMap<usize, u32>>, // id -> カウント
     pub locked_device: Mutex<Option<usize>>,
 }
 
@@ -42,7 +42,7 @@ impl TouchpadMonitor {
             ),
             x_delta: AtomicI32::new(0),
             y_delta: AtomicI32::new(0),
-            release_delay_ms: AtomicU32::new(200), // Default to 200ms
+            release_delay_ms: AtomicU32::new(200), // デフォルト 200ms
             app_handle,
             hwnd: Mutex::new(None),
             device_activity: Mutex::new(HashMap::new()),
@@ -56,7 +56,7 @@ impl TouchpadMonitor {
 
         let state_watch = Arc::clone(&state);
         std::thread::spawn(move || loop {
-            std::thread::sleep(std::time::Duration::from_millis(100)); // More frequent check for responsive delay
+            std::thread::sleep(std::time::Duration::from_millis(100)); // レスポンシブな遅延のためにチェック頻度を高くする
 
             if let Ok(h) = state_watch.app_handle.try_lock() {
                 if let Some(app) = &*h {
@@ -104,10 +104,10 @@ impl TouchpadMonitor {
             };
 
             let mut unique_pairs = std::collections::HashSet::new();
-            unique_pairs.insert((0x01, 0x02)); // Mouse
-                                               // unique_pairs.insert((0x01, 0x06)); // KEYBOARD (Diagnostic!) - REMOVED to prevent self-trigger
-            unique_pairs.insert((0x0D, 0x04)); // Touch Screen
-            unique_pairs.insert((0x0D, 0x05)); // Touch Pad
+            unique_pairs.insert((0x01, 0x02)); // マウス
+                                               // unique_pairs.insert((0x01, 0x06)); // キーボード (診断用!) - 自己トリガー防止のため削除
+            unique_pairs.insert((0x0D, 0x04)); // タッチスクリーン
+            unique_pairs.insert((0x0D, 0x05)); // タッチパッド
 
             audit_log("[MONITOR] Registering for Raw Input");
 
@@ -144,6 +144,10 @@ impl TouchpadMonitor {
 
     pub fn consume_y_delta(&self) -> i32 {
         self.state.y_delta.swap(0, Ordering::SeqCst)
+    }
+
+    pub fn consume_x_delta(&self) -> i32 {
+        self.state.x_delta.swap(0, Ordering::SeqCst)
     }
 
     fn run_monitor(state: Arc<MonitorState>) {
@@ -192,7 +196,7 @@ impl TouchpadMonitor {
                 Arc::into_raw(Arc::clone(&state)) as isize,
             );
 
-            // Trigger mapping scan immediately after window creation
+            // ウィンドウ作成直後にマッピングスキャンをトリガー
             let s_ptr = Arc::into_raw(Arc::clone(&state));
             let s = Arc::from_raw(s_ptr);
             let m = TouchpadMonitor { state: s };
@@ -254,24 +258,26 @@ impl TouchpadMonitor {
                         }
                     }
 
-                    // Filter out injected inputs (hDevice == 0 usually indicates SendInput)
-                    // This prevents self-loops where our simulated actions trigger the monitor
+                    // 注入された入力を除外 (hDevice == 0 は通常 SendInput を示す)
+                    // これにより、シミュレートされたアクションがモニターをトリガーする自己ループを防ぐ
                     if raw.header.hDevice.is_null() {
                         return DefWindowProcW(hwnd, msg, wparam, lparam);
                     }
 
                     if raw.header.dwType == RIM_TYPEMOUSE {
                         let m = raw.data.mouse();
-                        // Only count as "Touched" if there is ACTUAL movement or button press.
-                        // Ignore usFlags or other metadata that might spark noise.
+                        // 実際の移動またはボタン押下がある場合のみ「タッチ」としてカウントする。
+                        // ノイズを引き起こす可能性のある usFlags やその他のメタデータは無視する。
                         if m.lLastX != 0 || m.lLastY != 0 || m.ulRawButtons != 0 {
                             event_detected = true;
+                            // 自然な座標に戻す。
+                            // 指右移動 = 正のX、指上移動 = 負のY（画面空間）
                             state.x_delta.fetch_add(m.lLastX, Ordering::SeqCst);
-                            state.y_delta.fetch_add(-m.lLastY, Ordering::SeqCst);
+                            state.y_delta.fetch_add(m.lLastY, Ordering::SeqCst);
                         }
                     } else if raw.header.dwType == RIM_TYPEHID {
-                        // For HID (Touchpad/Digitizer), we assume any report implies activity
-                        // But we should be careful.
+                        // HID (タッチパッド/デジタイザ) の場合、レポートがあればアクティビティがあるとみなす
+                        // ただし注意が必要。
                         event_detected = true;
                     }
 

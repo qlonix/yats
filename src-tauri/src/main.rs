@@ -1,4 +1,4 @@
-// Prevents additional console window on Windows in release, DO NOT REMOVE!!
+// Windowsのリリースビルドで追加のコンソールウィンドウを防ぐ。削除禁止！！
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {

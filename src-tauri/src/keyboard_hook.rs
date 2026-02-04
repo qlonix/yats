@@ -9,10 +9,11 @@ use winapi::um::winuser::{
     GetForegroundWindow, IsZoomed, PostMessageW, SendInput, ShowWindow, INPUT, INPUT_MOUSE,
     KEYEVENTF_KEYUP, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP, MOUSEEVENTF_MIDDLEDOWN,
     MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL,
-    MOUSEINPUT, SC_CLOSE, SC_MOVE, SW_MAXIMIZE, SW_MINIMIZE, SW_RESTORE, WM_SYSCOMMAND,
+    MOUSEINPUT, SC_CLOSE, SW_MAXIMIZE, SW_MINIMIZE, SW_RESTORE, WM_SYSCOMMAND,
 };
 
 pub static IS_PAUSED: AtomicBool = AtomicBool::new(false);
+pub static IS_SIMULATING: AtomicBool = AtomicBool::new(false);
 
 pub struct KeyboardHook {
     monitor: Arc<TouchpadMonitor>,
@@ -28,7 +29,7 @@ pub enum RemapCommand {
 
 const INPUT_KEYBOARD: u32 = 1;
 
-// v0.4.7: Browser Navigation VK Constants
+// v0.4.7: ブラウザナビゲーション用仮想キー定数
 const VK_BROWSER_BACK: u16 = 0xA6;
 const VK_BROWSER_FORWARD: u16 = 0xA7;
 
@@ -85,7 +86,7 @@ fn send_mouse_scroll(delta: i32) {
 fn execute_action(action: Action, pressed: bool) {
     match action {
         Action::MouseClick(mb) => {
-            // Drag Support: Map KeyPress to MouseDown, KeyRelease to MouseUp
+            // ドラッグ対応: キープレスを MouseDown に、キーリリースを MouseUp にマッピング
             if pressed {
                 send_mouse_click(&mb, true);
             } else {
@@ -93,9 +94,9 @@ fn execute_action(action: Action, pressed: bool) {
             }
         }
         Action::MouseDoubleClick(mb) => {
-            // Double Click Drag:
-            // Press -> Click, Release, Down (Hold)
-            // Release -> Up
+            // ダブルクリックドラッグ:
+            // 押下 -> クリック、リリース、ダウン（保持）
+            // リリース -> アップ
             if pressed {
                 send_mouse_click(&mb, true);
                 send_mouse_click(&mb, false);
@@ -106,15 +107,23 @@ fn execute_action(action: Action, pressed: bool) {
             }
         }
         Action::MouseScroll(_) => {} // Handled elsewhere
-        Action::KeyMacro(keys) => {
+        Action::KeyMacro(steps) => {
             if pressed {
-                for key in &keys {
-                    let _ = simulate(&EventType::KeyPress(*key));
+                IS_SIMULATING.store(true, Ordering::SeqCst);
+                for step in steps {
+                    // コード内の全キーを押下
+                    for key in step.iter().cloned() {
+                        let _ = simulate(&EventType::KeyPress(key));
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(60));
+                    // 全キーを逆順で解放
+                    for key in step.iter().rev().cloned() {
+                        let _ = simulate(&EventType::KeyRelease(key));
+                    }
+                    // 解放後の待機
+                    std::thread::sleep(std::time::Duration::from_millis(40));
                 }
-                std::thread::sleep(std::time::Duration::from_millis(15));
-                for key in keys.iter().rev() {
-                    let _ = simulate(&EventType::KeyRelease(*key));
-                }
+                IS_SIMULATING.store(false, Ordering::SeqCst);
             }
         }
         Action::Window(win_act) => {
@@ -140,9 +149,6 @@ fn execute_action(action: Action, pressed: bool) {
                             } else {
                                 ShowWindow(hwnd, SW_MAXIMIZE);
                             }
-                        }
-                        WindowAction::Move => {
-                            PostMessageW(hwnd, WM_SYSCOMMAND, SC_MOVE + 2, 0);
                         }
                     }
                 }
@@ -178,7 +184,9 @@ impl HookWorker {
         loop {
             while let Ok(cmd) = self.rx.try_recv() {
                 match cmd {
-                    RemapCommand::Execute(act, pressed) => execute_action(act, pressed),
+                    RemapCommand::Execute(act, pressed) => {
+                        execute_action(act, pressed);
+                    }
                     RemapCommand::UpdateScroll(cfg) => {
                         self.active_scroll = cfg;
                         if self.active_scroll.is_some() {
@@ -194,6 +202,10 @@ impl HookWorker {
                 }
             }
 
+            // アクション開始時の「飛び」を防ぐため、常にデルタを消費
+            let _dx = self.monitor.consume_x_delta();
+            let _dy = self.monitor.consume_y_delta();
+
             if let Some(cfg) = &self.active_scroll {
                 if let Some(anchor) = self.scroll_anchor {
                     unsafe {
@@ -205,27 +217,27 @@ impl HookWorker {
                 if raw_delta != 0 {
                     let mut delta = raw_delta;
 
-                    // Inversion
+                    // 反転
                     if cfg.invert {
                         delta = -delta;
                     }
 
-                    // Acceleration (Logarithmic-ish)
-                    // If accel is on, we square the delta sign-preserving or boost it
+                    // 加速 (対数的)
+                    // 加速ONの場合、符号を維持して二乗またはブースト
                     let mut scale = cfg.sensitivity as i32;
                     if cfg.acceleration {
-                        // Simple accel: magnitude * sensitivity * boost
-                        // Or just boost sensitivity non-linearly
-                        // Let's assume standard accel is just higher multiplier for faster movement
+                        // 単純加速: 大きさ * 感度 * ブースト
+                        // または非線形で感度をブースト
+                        // 標準加速は高速移動時により高い倍率がかかると仮定
                         if delta.abs() > 5 {
                             scale *= 2;
                         }
                     }
 
-                    // Standard scaling
-                    // Base sensitivity 100 = 1.0x
-                    // 200 = 2.0x, etc.
-                    // div 100 to normalize
+                    // 標準スケーリング
+                    // 基本感度 100 = 1.0倍
+                    // 200 = 2.0倍 など
+                    // 100で割って正規化
                     let scaled_delta = (delta * scale) / 10;
 
                     if scaled_delta != 0 {
@@ -263,11 +275,11 @@ impl KeyboardHook {
         let tx = self.tx.clone();
         let config_ref = Arc::clone(&self.config);
         let monitor_ref = Arc::clone(&self.monitor);
-        // Track pressed keys to ignore repeats
+        // リピート無視のため押下キーを追跡
         let pressed_keys = Arc::new(Mutex::new(std::collections::HashSet::new()));
 
         if let Err(e) = rdev::grab(move |event| {
-            if IS_PAUSED.load(Ordering::SeqCst) {
+            if IS_PAUSED.load(Ordering::SeqCst) || IS_SIMULATING.load(Ordering::SeqCst) {
                 return Some(event);
             }
 
@@ -278,9 +290,9 @@ impl KeyboardHook {
                         return None;
                     }
 
-                    // Safety Guard: If touchpad is not touched, pass through the key (do nothing special)
-                    // The user wants the key to "not trigger function" if no touch.
-                    // Usually this means "act as normal key".
+                    // 安全ガード: タッチパッドに触れていない場合はキーをスルー（何もしない）
+                    // タッチがない場合、ユーザーは「機能をトリガーしない」ことを望んでいる
+                    // 通常、これは「通常のキーとして動作する」ことを意味する
                     if !monitor_ref.is_touched() {
                         return Some(event);
                     }
@@ -307,9 +319,9 @@ impl KeyboardHook {
                 }
                 rdev::EventType::KeyRelease(key) => {
                     let mut keys = pressed_keys.lock().unwrap();
-                    // If the key was not in our set, it means we didn't capture the Press
-                    // (either because of Safety Guard or it wasn't mapped).
-                    // In that case, we MUST pass the Release through to the OS.
+                    // セットにキーがない場合、Pressをキャプチャしていないことを意味する
+                    // （安全ガードのため、またはマッピングされていなかったため）
+                    // その場合、ReleaseをOSにスルーしなければならない
                     if !keys.remove(&key) {
                         return Some(event);
                     }

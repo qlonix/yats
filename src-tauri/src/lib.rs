@@ -74,7 +74,7 @@ fn set_config(
     ));
     *config.write().unwrap() = new_config.clone();
 
-    // Sync monitor delay
+    // モニター遅延を同期
     monitor
         .state
         .release_delay_ms
@@ -287,6 +287,12 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            let _ = app.get_webview_window("main").map(|w| {
+                let _ = w.show();
+                let _ = w.set_focus();
+            });
+        }))
         .manage(monitor)
         .manage(config.clone())
         .invoke_handler(tauri::generate_handler![
@@ -327,7 +333,7 @@ pub fn run() {
                 cfg
             };
 
-            // Sync monitor delay from initial load
+            // 初期ロードからモニター遅延を同期
             monitor_clone
                 .state
                 .release_delay_ms
@@ -341,7 +347,7 @@ pub fn run() {
                 CheckMenuItem::with_id(app, "pause", "機能の一時停止", true, false, None::<&str>)?;
             let menu = Menu::with_items(app, &[&settings_i, &pause_i, &quit_i])?;
 
-            // Store handle for sync
+            // 同期用にハンドルを保存
             let _ = PAUSE_MENU_ITEM.set(pause_i.clone());
 
             let _tray = TrayIconBuilder::new()
@@ -363,7 +369,7 @@ pub fn run() {
                             let new_state = !is_checked;
                             IS_PAUSED.store(new_state, Ordering::SeqCst);
 
-                            // SYNC: Update the menu item checkmark visually
+                            // 同期: メニュー項目のチェックマークを視覚的に更新
                             if let Some(item) = PAUSE_MENU_ITEM.get() {
                                 let _ = item.set_checked(new_state);
                             }
@@ -391,7 +397,7 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            // Auto-scan on startup
+            // 起動時に自動スキャン
             monitor_clone.scan_and_register();
 
             std::thread::spawn(move || {

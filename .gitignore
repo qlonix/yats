@@ -22,3 +22,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Build Logs and Errors
+build_error*.txt
+build_log*.txt
+diagnostic_log*.txt
+src-tauri/build_error.txt
+src-tauri/build_result.txt
+src-tauri/build_log*.txt

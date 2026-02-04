@@ -1,29 +1,24 @@
 # YATS (Yet Another Touchpad Shortcut)
 
-**YATS** stands for **Yet Another Touchpad Shortcut**. 
+マウスカーソルを動かした直後にキーを押すと、マウスボタン押下やキーマクロ、ウィンドウ操作などを実行できます。実際には、タッチパッドに触れながらキーを押すことを想定しています。
 
-It is a Windows utility application designed to enhance your productivity by allowing you to trigger custom shortcuts, macros, and system actions directly via your touchpad. By mapping specific keys to touchpad-monitored gestures, you can perform complex tasks without ever taking your hands off the tracking surface.
+## 機能
 
-## Features
+- **タッチパッドトリガー**: タッチパッドの領域または特定のジェスチャをアクションにマッピングします。
+- **カスタマイズ可能なアクション**:
+  - マウスクリック (左、右、中、ダブルクリック)
+  - キーボードマクロ
+  - ウィンドウ操作 (閉じる、最大化/元に戻す、移動)
+  - スクロール
 
-- **Touchpad Triggers**: Map regions of your touchpad or specific gestures to actions.
-- **Customizable Actions**:
-  - Mouse Clicks (Left, Right, Middle, Double Click)
-  - Keyboard Macros
-  - Window Management (Close, Maximize/Restore, Move)
-  - Scrolling (Logarithmic sensitivity control)
-- **Advanced Logic**:
-  - **Safety Guard**: Prevents accidental triggers when typing or using the mouse.
-  - **Smart Drag**: Seamless drag-and-drop support.
-  - **Scroll Smoothing**: High-resolution scroll injection for a native feel.
-- **System Integration**:
-  - Run on Startup
-  - System Tray control (Pause/Resume)
+## 開発
 
-## Development
+このプロジェクトのコード、ドキュメント等はすべて **Antigravity** によって生成されました。
 
-This project is developed solely by **Antigravity**.
+## 注意
 
-## License
+AI生成されたコードであるため、不適切なコードによる深刻な問題が発生する可能性があります。
+
+## ライセンス
 
 [MIT](LICENSE)

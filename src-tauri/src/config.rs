@@ -26,7 +26,6 @@ pub enum WindowAction {
     Close,
     Minimize,
     Maximize,
-    Move,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -35,7 +34,7 @@ pub enum Action {
     MouseClick(MouseButton),
     MouseDoubleClick(MouseButton),
     MouseScroll(ScrollConfig),
-    KeyMacro(Vec<Key>),
+    KeyMacro(Vec<Vec<Key>>),
     Window(WindowAction),
     BrowserBack,
     BrowserForward,
@@ -50,7 +49,7 @@ pub struct AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         let mut mappings = HashMap::new();
-        // Default mapping: F12 -> Scroll (Standard sensitivity)
+        // デフォルトマッピング: F12 -> スクロール (標準感度)
         mappings.insert(
             Key::F12,
             Action::MouseScroll(ScrollConfig {
@@ -72,8 +71,37 @@ impl AppConfig {
         let path = Self::get_config_path(app);
         if path.exists() {
             if let Ok(content) = fs::read_to_string(path) {
+                // 最初に直接デシリアライズを試みる
                 if let Ok(config) = serde_json::from_str::<AppConfig>(&content) {
                     return config;
+                }
+
+                // 失敗した場合、KeyMacro 型の手動移行を試みる
+                if let Ok(mut value) = serde_json::from_str::<serde_json::Value>(&content) {
+                    if let Some(mappings) =
+                        value.get_mut("mappings").and_then(|m| m.as_object_mut())
+                    {
+                        for (_, action) in mappings {
+                            if action.get("type")
+                                == Some(&serde_json::Value::String("KeyMacro".to_string()))
+                            {
+                                if let Some(val) = action.get_mut("value") {
+                                    if val.is_array() {
+                                        let arr = val.as_array().unwrap();
+                                        // 文字列のフラット配列の場合、ネストする
+                                        if !arr.is_empty() && arr[0].is_string() {
+                                            let migrated = serde_json::json!([arr]);
+                                            *val = migrated;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // 移行したオブジェクトのデシリアライズを試みる
+                    if let Ok(config) = serde_json::from_value::<AppConfig>(value) {
+                        return config;
+                    }
                 }
             }
         }
