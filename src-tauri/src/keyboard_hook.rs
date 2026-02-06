@@ -1,10 +1,12 @@
 use crate::config::{Action, AppConfig, MouseButton, ScrollConfig, WindowAction};
 use crate::touchpad_monitor::TouchpadMonitor;
+use enigo::{Button, Coordinate, Direction, Enigo, Keyboard, Mouse, Settings};
 use rdev::{simulate, EventType};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex, RwLock};
 use tauri::AppHandle;
+#[cfg(target_os = "windows")]
 use winapi::um::winuser::{
     GetForegroundWindow, IsZoomed, PostMessageW, SendInput, ShowWindow, INPUT, INPUT_MOUSE,
     KEYEVENTF_KEYUP, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP, MOUSEEVENTF_MIDDLEDOWN,
@@ -33,6 +35,7 @@ const INPUT_KEYBOARD: u32 = 1;
 const VK_BROWSER_BACK: u16 = 0xA6;
 const VK_BROWSER_FORWARD: u16 = 0xA7;
 
+#[cfg(target_os = "windows")]
 fn send_mouse_click(mb: &MouseButton, pressed: bool) {
     unsafe {
         let mut input: INPUT = std::mem::zeroed();
@@ -53,6 +56,23 @@ fn send_mouse_click(mb: &MouseButton, pressed: bool) {
     }
 }
 
+#[cfg(target_os = "linux")]
+fn send_mouse_click(mb: &MouseButton, pressed: bool) {
+    let mut enigo = Enigo::new(&Settings::default()).unwrap();
+    let button = match mb {
+        MouseButton::Left => Button::Left,
+        MouseButton::Right => Button::Right,
+        MouseButton::Middle => Button::Middle,
+    };
+    let direction = if pressed {
+        Direction::Press
+    } else {
+        Direction::Release
+    };
+    let _ = enigo.button(button, direction);
+}
+
+#[cfg(target_os = "windows")]
 fn send_key_click(vk: u16, pressed: bool) {
     unsafe {
         let mut input: INPUT = std::mem::zeroed();
@@ -69,6 +89,26 @@ fn send_key_click(vk: u16, pressed: bool) {
     }
 }
 
+#[cfg(target_os = "linux")]
+fn send_key_click(vk: u16, pressed: bool) {
+    // Note: Linux mapping for browser keys via Enigo/X11 might need more specific handling
+    // For now, we use a simple approach.
+    use enigo::Key;
+    let key = match vk {
+        0xA6 => Key::BrowserBack,
+        0xA7 => Key::BrowserForward,
+        _ => return,
+    };
+    let mut enigo = Enigo::new(&Settings::default()).unwrap();
+    let direction = if pressed {
+        Direction::Press
+    } else {
+        Direction::Release
+    };
+    let _ = enigo.key(key, direction);
+}
+
+#[cfg(target_os = "windows")]
 fn send_mouse_scroll(delta: i32) {
     unsafe {
         let mut input: INPUT = std::mem::zeroed();
@@ -82,6 +122,17 @@ fn send_mouse_scroll(delta: i32) {
 
         *input.u.mi_mut() = mi;
         SendInput(1, &mut input, std::mem::size_of::<INPUT>() as i32);
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn send_mouse_scroll(delta: i32) {
+    let mut enigo = Enigo::new(&Settings::default()).unwrap();
+    // Enigo's scroll uses 'length', positive is up/right.
+    // We divide by a factor to match the Windows sensitivity roughly on Linux.
+    let scroll_amount = delta / 20;
+    if scroll_amount != 0 {
+        let _ = enigo.scroll(scroll_amount, enigo::Axis::Vertical);
     }
 }
 
@@ -130,6 +181,7 @@ fn execute_action(action: Action, pressed: bool) {
         }
         Action::Window(win_act) => {
             if pressed {
+                #[cfg(target_os = "windows")]
                 unsafe {
                     let hwnd = GetForegroundWindow();
                     if hwnd.is_null() {
@@ -167,6 +219,20 @@ fn execute_action(action: Action, pressed: bool) {
                         }
                     }
                 }
+
+                #[cfg(target_os = "linux")]
+                {
+                    use std::process::Command;
+                    let arg = match win_act {
+                        WindowAction::Close => "windowclose",
+                        WindowAction::Minimize => "windowminimize",
+                        WindowAction::Maximize => "windowsize --usehints %1 100% 100%", // Simplified maximize
+                    };
+                    // Using xdotool for window management on X11
+                    let _ = Command::new("xdotool")
+                        .args(&["getactivewindow", arg])
+                        .status();
+                }
             }
         }
         Action::BrowserBack => {
@@ -183,7 +249,10 @@ pub struct HookWorker {
     active_scroll: Option<ScrollConfig>,
     monitor: Arc<TouchpadMonitor>,
     config: Arc<RwLock<AppConfig>>, // v2.3.0: Read global settings
+    #[cfg(target_os = "windows")]
     scroll_anchor: Option<winapi::shared::windef::POINT>,
+    #[cfg(target_os = "linux")]
+    scroll_anchor: Option<(i32, i32)>,
     accumulator_y: f32,                   // v2.0.2: Fine-grained accumulator
     last_scroll_time: std::time::Instant, // v2.0.2: Batching dispatcher
 }
@@ -215,10 +284,17 @@ impl HookWorker {
                     RemapCommand::UpdateScroll(cfg) => {
                         self.active_scroll = cfg;
                         if self.active_scroll.is_some() {
+                            #[cfg(target_os = "windows")]
                             unsafe {
                                 let mut pt = std::mem::zeroed();
                                 winapi::um::winuser::GetCursorPos(&mut pt);
                                 self.scroll_anchor = Some(pt);
+                            }
+                            #[cfg(target_os = "linux")]
+                            {
+                                let enigo = Enigo::new(&Settings::default()).unwrap();
+                                let (x, y) = enigo.location().unwrap_or((0, 0));
+                                self.scroll_anchor = Some((x, y));
                             }
                         } else {
                             self.scroll_anchor = None;
@@ -232,8 +308,14 @@ impl HookWorker {
             // 2. Main Logic
             if let Some(_cfg) = &self.active_scroll {
                 if let Some(anchor) = self.scroll_anchor {
+                    #[cfg(target_os = "windows")]
                     unsafe {
                         winapi::um::winuser::SetCursorPos(anchor.x, anchor.y);
+                    }
+                    #[cfg(target_os = "linux")]
+                    {
+                        let mut enigo = Enigo::new(&Settings::default()).unwrap();
+                        let _ = enigo.move_mouse(anchor.0, anchor.1, Coordinate::Abs);
                     }
                 }
 

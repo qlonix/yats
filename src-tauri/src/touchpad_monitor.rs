@@ -4,17 +4,26 @@ use std::ptr::null_mut;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
+#[cfg(target_os = "windows")]
 use winapi::shared::windef::HWND;
+#[cfg(target_os = "windows")]
 use winapi::um::libloaderapi::GetModuleHandleW;
+#[cfg(target_os = "windows")]
 use winapi::um::winuser::{
     CreateWindowExW, DefWindowProcW, GetRawInputData, RegisterClassW, RegisterRawInputDevices,
     HRAWINPUT, RAWINPUT, RAWINPUTDEVICE, RAWINPUTHEADER, RID_INPUT, RIM_TYPEHID, RIM_TYPEMOUSE,
     WM_INPUT, WNDCLASSW,
 };
 
+#[cfg(target_os = "linux")]
+use evdev::{AbsoluteAxisType, Device, EventType};
+
+#[cfg(target_os = "windows")]
 #[derive(Clone, Copy)]
 struct SendHwnd(HWND);
+#[cfg(target_os = "windows")]
 unsafe impl Send for SendHwnd {}
+#[cfg(target_os = "windows")]
 unsafe impl Sync for SendHwnd {}
 
 pub struct MonitorState {
@@ -24,6 +33,7 @@ pub struct MonitorState {
     pub y_delta: AtomicI32,
     pub release_delay_ms: AtomicU32,
     pub app_handle: Arc<Mutex<Option<AppHandle>>>,
+    #[cfg(target_os = "windows")]
     hwnd: Mutex<Option<SendHwnd>>,
     pub device_activity: Mutex<HashMap<usize, u32>>, // id -> カウント
     pub locked_device: Mutex<Option<usize>>,
@@ -44,6 +54,7 @@ impl TouchpadMonitor {
             y_delta: AtomicI32::new(0),
             release_delay_ms: AtomicU32::new(150), // v1.1.0: 安定性のためのバランス (50ms -> 150ms)
             app_handle,
+            #[cfg(target_os = "windows")]
             hwnd: Mutex::new(None),
             device_activity: Mutex::new(HashMap::new()),
             locked_device: Mutex::new(None),
@@ -103,6 +114,7 @@ impl TouchpadMonitor {
         Self { state }
     }
 
+    #[cfg(target_os = "windows")]
     pub fn scan_and_register(&self) {
         unsafe {
             let hwnd_wrapped = { *self.state.hwnd.lock().unwrap() };
@@ -141,6 +153,12 @@ impl TouchpadMonitor {
         }
     }
 
+    #[cfg(target_os = "linux")]
+    pub fn scan_and_register(&self) {
+        audit_log("[MONITOR] Device scan requested (Linux)");
+        // Linux implementation will find and open devices in run_monitor
+    }
+
     pub fn lock_device(&self, device_id: Option<usize>) {
         *self.state.locked_device.lock().unwrap() = device_id;
         audit_log(&format!("[MONITOR] Locked to device: {:?}", device_id));
@@ -158,6 +176,7 @@ impl TouchpadMonitor {
         self.state.x_delta.swap(0, Ordering::SeqCst)
     }
 
+    #[cfg(target_os = "windows")]
     fn run_monitor(state: Arc<MonitorState>) {
         unsafe {
             let h_instance = GetModuleHandleW(null_mut());
@@ -218,6 +237,102 @@ impl TouchpadMonitor {
         }
     }
 
+    #[cfg(target_os = "linux")]
+    fn run_monitor(state: Arc<MonitorState>) {
+        audit_log("[MONITOR] Starting Linux Monitor Worker");
+
+        loop {
+            // Find touchpad devices
+            let mut devices = Vec::new();
+            if let Ok(dir) = std::fs::read_dir("/dev/input") {
+                for entry in dir.flatten() {
+                    let path = entry.path();
+                    if path.to_string_lossy().contains("event") {
+                        if let Ok(device) = Device::open(&path) {
+                            let name = device.name().unwrap_or("Unknown");
+                            let is_touchpad = name.to_lowercase().contains("touchpad")
+                                || (device.supported_events().contains(EventType::ABSOLUTE)
+                                    && device.supported_absolute_axes().map_or(false, |axes| {
+                                        axes.contains(AbsoluteAxisType::ABS_X)
+                                    }));
+
+                            if is_touchpad {
+                                audit_log(&format!(
+                                    "[MONITOR] Found Touchpad: {} at {:?}",
+                                    name, path
+                                ));
+                                devices.push(device);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if devices.is_empty() {
+                audit_log("[MONITOR] No touchpad found, retrying in 5s...");
+                std::thread::sleep(std::time::Duration::from_secs(5));
+                continue;
+            }
+
+            // Monitor events from all found touchpads
+            let mut threads = Vec::new();
+            for mut device in devices {
+                let s_clone = Arc::clone(&state);
+                threads.push(std::thread::spawn(move || {
+                    loop {
+                        if let Ok(events) = device.fetch_events() {
+                            for ev in events {
+                                if ev.event_type() == EventType::ABSOLUTE
+                                    || ev.event_type() == EventType::RELATIVE
+                                    || ev.event_type() == EventType::KEY
+                                {
+                                    s_clone.is_touched.store(true, Ordering::SeqCst);
+                                    if let Ok(mut last_time) = s_clone.last_touch_time.lock() {
+                                        *last_time = std::time::Instant::now();
+                                    }
+
+                                    // Handle relative movement for scrolling
+                                    if ev.event_type() == EventType::RELATIVE {
+                                        match ev.code() {
+                                            0 => {
+                                                s_clone
+                                                    .x_delta
+                                                    .fetch_add(ev.value(), Ordering::SeqCst);
+                                            } // REL_X
+                                            1 => {
+                                                s_clone
+                                                    .y_delta
+                                                    .fetch_add(ev.value(), Ordering::SeqCst);
+                                            } // REL_Y
+                                            _ => {}
+                                        }
+                                    }
+
+                                    // UI Update
+                                    if let Ok(h) = s_clone.app_handle.try_lock() {
+                                        if let Some(app) = &*h {
+                                            let _ = app.emit("touchpad-status", true).ok();
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            break; // Device disconnected or error
+                        }
+                    }
+                }));
+            }
+
+            // Wait for threads (they should only finish if device is lost)
+            for t in threads {
+                let _ = t.join();
+            }
+            audit_log("[MONITOR] Device lost, rescanning...");
+            std::thread::sleep(std::time::Duration::from_secs(2));
+        }
+    }
+
+    #[cfg(target_os = "windows")]
     unsafe extern "system" fn wnd_proc(
         hwnd: HWND,
         msg: u32,

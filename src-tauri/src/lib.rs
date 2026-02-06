@@ -17,15 +17,23 @@ use tauri::{
     tray::{MouseButton, TrayIconBuilder, TrayIconEvent},
     Emitter, Manager,
 };
+#[cfg(target_os = "windows")]
 use winreg::enums::*;
+#[cfg(target_os = "windows")]
 use winreg::RegKey;
 
 static LOG_PATH: OnceLock<PathBuf> = OnceLock::new();
 static LOG_TX: OnceLock<Sender<String>> = OnceLock::new();
 static PAUSE_MENU_ITEM: OnceLock<CheckMenuItem<tauri::Wry>> = OnceLock::new();
 
+#[cfg(target_os = "windows")]
 pub fn is_elevated() -> bool {
     std::fs::metadata("C:\\Windows\\System32\\config\\SAM").is_ok()
+}
+
+#[cfg(target_os = "linux")]
+pub fn is_elevated() -> bool {
+    nix::unistd::Uid::effective().is_root()
 }
 
 pub fn audit_log(msg: &str) {
@@ -146,6 +154,7 @@ fn set_paused_cmd(app: tauri::AppHandle, paused: bool) {
     audit_log(&format!("[SYSTEM] Pause state changed to: {}", paused));
 }
 
+#[cfg(target_os = "windows")]
 #[tauri::command]
 fn set_startup_cmd(enabled: bool) -> Result<(), String> {
     audit_log(&format!("[SYSTEM] Startup toggle requested: {}", enabled));
@@ -192,6 +201,44 @@ fn set_startup_cmd(enabled: bool) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(target_os = "linux")]
+#[tauri::command]
+fn set_startup_cmd(enabled: bool) -> Result<(), String> {
+    audit_log(&format!(
+        "[SYSTEM] Startup toggle requested (Linux): {}",
+        enabled
+    ));
+
+    let home = std::env::var("HOME").map_err(|e| e.to_string())?;
+    let mut autostart_dir = std::path::PathBuf::from(home);
+    autostart_dir.push(".config");
+    autostart_dir.push("autostart");
+
+    if !autostart_dir.exists() {
+        std::fs::create_dir_all(&autostart_dir).map_err(|e| e.to_string())?;
+    }
+
+    let mut desktop_file = autostart_dir.clone();
+    desktop_file.push("yats.desktop");
+
+    if enabled {
+        let exe_path = std::env::current_exe().map_err(|e| e.to_string())?;
+        let content = format!(
+            "[Desktop Entry]\nType=Application\nName=YATS\nExec={}\nHidden=false\nNoDisplay=false\nX-GNOME-Autostart-enabled=true\n",
+            exe_path.to_string_lossy()
+        );
+        std::fs::write(&desktop_file, content).map_err(|e| e.to_string())?;
+        audit_log("[SYSTEM] Startup .desktop file created.");
+    } else {
+        if desktop_file.exists() {
+            std::fs::remove_file(desktop_file).map_err(|e| e.to_string())?;
+            audit_log("[SYSTEM] Startup .desktop file removed.");
+        }
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
 #[tauri::command]
 fn get_startup_status_cmd() -> bool {
     let app_data = match std::env::var("APPDATA") {
@@ -205,6 +252,28 @@ fn get_startup_status_cmd() -> bool {
     startup_path.exists()
 }
 
+#[cfg(target_os = "linux")]
+#[tauri::command]
+fn get_startup_status_cmd() -> bool {
+    let home = match std::env::var("HOME") {
+        Ok(v) => v,
+        Err(_) => return false,
+    };
+    let mut desktop_file = std::path::PathBuf::from(home);
+    desktop_file.push(".config");
+    desktop_file.push("autostart");
+    desktop_file.push("yats.desktop");
+
+    desktop_file.exists()
+}
+
+#[cfg(target_os = "windows")]
+#[tauri::command]
+fn dump_registry_skipped() -> Result<String, String> {
+    Ok("Skipped on Linux".to_string())
+}
+
+#[cfg(target_os = "windows")]
 #[tauri::command]
 fn get_aap_threshold() -> Result<i32, String> {
     let output = Command::new("reg")
@@ -238,6 +307,7 @@ fn get_aap_threshold() -> Result<i32, String> {
     Ok(2)
 }
 
+#[cfg(target_os = "windows")]
 #[tauri::command]
 fn set_aap_threshold(value: i32) -> Result<(), String> {
     audit_log(&format!(
@@ -261,6 +331,7 @@ fn set_aap_threshold(value: i32) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(target_os = "windows")]
 #[tauri::command]
 fn deep_registry_clean_cmd() -> Result<String, String> {
     if !is_elevated() {
@@ -303,6 +374,22 @@ fn deep_registry_clean_cmd() -> Result<String, String> {
         results
     ));
     Ok(results.join(", "))
+}
+
+#[cfg(target_os = "linux")]
+#[tauri::command]
+fn get_aap_threshold() -> Result<i32, String> {
+    Ok(0)
+}
+#[cfg(target_os = "linux")]
+#[tauri::command]
+fn set_aap_threshold(_value: i32) -> Result<(), String> {
+    Ok(())
+}
+#[cfg(target_os = "linux")]
+#[tauri::command]
+fn deep_registry_clean_cmd() -> Result<String, String> {
+    Ok("Not supported on Linux".to_string())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

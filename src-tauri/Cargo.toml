@@ -24,8 +24,14 @@ tauri-plugin-single-instance = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rdev = { version = "0.5", features = ["unstable_grab", "serialize"] }
-enigo = "0.3"
-winapi = { version = "0.3", features = ["winuser", "hidpi", "shlobj", "libloaderapi"] }
+enigo = { version = "0.3", features = ["x11rb"] }
 chrono = "0.4"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["winuser", "hidpi", "shlobj", "libloaderapi"] }
 winreg = "0.52"
+
+[target.'cfg(unix)'.dependencies]
+evdev = "0.12"
+nix = { version = "0.27", features = ["user"] }
 
