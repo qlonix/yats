@@ -76,6 +76,8 @@ fn send_mouse_scroll(delta: i32) {
         let mut mi: MOUSEINPUT = std::mem::zeroed();
 
         mi.dwFlags = MOUSEEVENTF_WHEEL;
+        // v1.2.2: Micro-Scrolling 対応のため生値を受け取るように変更
+        // 呼び出し側で適切な値 (例: 20, 30, 120) を計算して渡す
         mi.mouseData = delta as u32;
 
         *input.u.mi_mut() = mi;
@@ -134,6 +136,19 @@ fn execute_action(action: Action, pressed: bool) {
                         return;
                     }
 
+                    // v2.9.0: ウィンドウ・ガード
+                    // デスクトップやタスクバーなどのシステムシェルを操作対象から除外する
+                    let mut class_name = [0u16; 256];
+                    let len =
+                        winapi::um::winuser::GetClassNameW(hwnd, class_name.as_mut_ptr(), 256);
+                    if len > 0 {
+                        let name = String::from_utf16_lossy(&class_name[..len as usize]);
+                        // Progman/WorkerW はデスクトップ、Shell_TrayWnd はタスクバー
+                        if name == "Progman" || name == "WorkerW" || name == "Shell_TrayWnd" {
+                            return;
+                        }
+                    }
+
                     match win_act {
                         WindowAction::Close => {
                             // SC_CLOSE is more robust for window closing
@@ -167,16 +182,26 @@ pub struct HookWorker {
     rx: Receiver<RemapCommand>,
     active_scroll: Option<ScrollConfig>,
     monitor: Arc<TouchpadMonitor>,
+    config: Arc<RwLock<AppConfig>>, // v2.3.0: Read global settings
     scroll_anchor: Option<winapi::shared::windef::POINT>,
+    accumulator_y: f32,                   // v2.0.2: Fine-grained accumulator
+    last_scroll_time: std::time::Instant, // v2.0.2: Batching dispatcher
 }
 
 impl HookWorker {
-    pub fn new(rx: Receiver<RemapCommand>, monitor: Arc<TouchpadMonitor>) -> Self {
+    pub fn new(
+        rx: Receiver<RemapCommand>,
+        monitor: Arc<TouchpadMonitor>,
+        config: Arc<RwLock<AppConfig>>,
+    ) -> Self {
         Self {
             rx,
             active_scroll: None,
             monitor,
+            config,
             scroll_anchor: None,
+            accumulator_y: 0.0,
+            last_scroll_time: std::time::Instant::now(),
         }
     }
 
@@ -202,53 +227,63 @@ impl HookWorker {
                 }
             }
 
-            // アクション開始時の「飛び」を防ぐため、常にデルタを消費
-            let _dx = self.monitor.consume_x_delta();
-            let _dy = self.monitor.consume_y_delta();
+            // 1. Process commands as before...
 
-            if let Some(cfg) = &self.active_scroll {
+            // 2. Main Logic
+            if let Some(_cfg) = &self.active_scroll {
                 if let Some(anchor) = self.scroll_anchor {
                     unsafe {
                         winapi::um::winuser::SetCursorPos(anchor.x, anchor.y);
                     }
                 }
 
+                // v2.1.1: Double-consumption bug fixed.
+                // 以前はループの冒頭で _dy を消費し、ここで再び consume していたため、
+                // 大半の入力が 0 になり、スクロールが「重く」「カクつく」原因になっていた。
                 let raw_delta = self.monitor.consume_y_delta();
                 if raw_delta != 0 {
-                    let mut delta = raw_delta;
+                    // v2.3.0: Global Scroll Settings & Range Shift
+                    // 以前はキー毎に感度を持っていましたが、全キー共通のグローバル設定に変更しました。
+                    // また、感度のレンジをさらに調整：旧 50% (Sens 50) が新 100% になるようにシフト（2倍細かく）。
 
-                    // 反転
-                    if cfg.invert {
+                    let (global_sens, global_invert) = {
+                        let cfg_lock = self.config.read().unwrap();
+                        (cfg_lock.scroll_sensitivity, cfg_lock.scroll_invert)
+                    };
+
+                    let mut delta = raw_delta;
+                    // v2.3.0: Invert prioritize global setting, fallback to per-key if needed (but UI now forces global)
+                    if global_invert {
                         delta = -delta;
                     }
 
-                    // Linear Smooth Scroll (v1.0.1 Fix)
-                    // 以前の計算 (delta * sensitivty / 10) は倍率が高すぎて (10倍)、
-                    // 加速のように感じられた可能性があります。
-                    // より穏やかで、リニアなスケーリングに変更します。
-                    // Sensitivity 100 = 2.5x Multiplier (100 / 40)
-                    let scale = cfg.sensitivity as i32;
-                    let mut scaled_delta = (delta * scale) / 40;
+                    // Gain = global_sens / 100.0
+                    // v2.7.0: Reverted to linear gain.
+                    // UI handles the logarithmic mapping for the slider position.
+                    let gain = (global_sens as f32) / 100.0;
 
-                    // 加速が有効な場合のみブースト (ユーザー設定がONの場合)
-                    if cfg.acceleration {
-                        if delta.abs() > 5 {
-                            scaled_delta *= 2;
-                        }
-                    }
-
-                    // 最小値保証 (動きが小さすぎて0にならないように)
-                    if delta != 0 && scaled_delta == 0 {
-                        scaled_delta = if delta > 0 { 1 } else { -1 };
-                    }
-
-                    if scaled_delta != 0 {
-                        send_mouse_scroll(scaled_delta);
-                    }
+                    const LINEAR_SCALE: f32 = 40.0;
+                    self.accumulator_y += (delta as f32) * gain * LINEAR_SCALE;
                 }
+
+                // 3. Batching Dispatcher (Smooth 125Hz)
+                let now = std::time::Instant::now();
+                if now.duration_since(self.last_scroll_time).as_millis() >= 8 {
+                    let output = self.accumulator_y.trunc() as i32;
+                    if output != 0 {
+                        send_mouse_scroll(output);
+                        self.accumulator_y -= output as f32;
+                    }
+                    self.last_scroll_time = now;
+                }
+            } else {
+                // スクロール中でない時はデルタを捨てて蓄積を防ぐ
+                self.monitor.consume_x_delta();
+                self.monitor.consume_y_delta();
+                self.accumulator_y = 0.0; // アキュムレータもリセット
             }
 
-            std::thread::sleep(std::time::Duration::from_millis(5));
+            std::thread::sleep(std::time::Duration::from_millis(1));
         }
     }
 }
@@ -261,8 +296,9 @@ impl KeyboardHook {
     ) -> Self {
         let (tx, rx) = channel();
         let mon_clone = Arc::clone(&monitor);
+        let cfg_clone = Arc::clone(&config);
         std::thread::spawn(move || {
-            let mut worker = HookWorker::new(rx, mon_clone);
+            let mut worker = HookWorker::new(rx, mon_clone, cfg_clone);
             worker.run();
         });
 

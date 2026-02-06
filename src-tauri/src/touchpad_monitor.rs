@@ -42,7 +42,7 @@ impl TouchpadMonitor {
             ),
             x_delta: AtomicI32::new(0),
             y_delta: AtomicI32::new(0),
-            release_delay_ms: AtomicU32::new(200), // デフォルト 200ms
+            release_delay_ms: AtomicU32::new(150), // v1.1.0: 安定性のためのバランス (50ms -> 150ms)
             app_handle,
             hwnd: Mutex::new(None),
             device_activity: Mutex::new(HashMap::new()),
@@ -62,8 +62,16 @@ impl TouchpadMonitor {
                 if let Some(app) = &*h {
                     let _ = app.emit("monitor-heartbeat", true).ok();
 
-                    let activity = { state_watch.device_activity.lock().unwrap().clone() };
-                    let mut sorted: Vec<_> = activity.into_iter().collect();
+                    let mut activity = state_watch.device_activity.lock().unwrap();
+
+                    // v1.2.2: 劣化対策 - マップの定期クリーンアップ
+                    // デバイスIDが無限に増える（ドライバの挙動等）場合、マップが肥大化してループが遅くなり、
+                    // 結果としてスクロールが「徐々に鈍くなり止まる」現象を引き起こす可能性がある。
+                    if activity.len() > 50 {
+                        activity.clear();
+                    }
+
+                    let mut sorted: Vec<_> = activity.clone().into_iter().collect();
                     sorted.sort_by(|a, b| b.1.cmp(&a.1));
                     let top: Vec<String> = sorted
                         .iter()
@@ -266,18 +274,20 @@ impl TouchpadMonitor {
 
                     if raw.header.dwType == RIM_TYPEMOUSE {
                         let m = raw.data.mouse();
-                        // 実際の移動またはボタン押下がある場合のみ「タッチ」としてカウントする。
-                        // ノイズを引き起こす可能性のある usFlags やその他のメタデータは無視する。
-                        if m.lLastX != 0 || m.lLastY != 0 || m.ulRawButtons != 0 {
+                        // v1.1.0: 再構築 - 基本的な移動をすべて受け入れる
+                        // ノイズフィルタリングは行わず、全ての移動イベントを信頼する
+                        if m.lLastX != 0 || m.lLastY != 0 {
                             event_detected = true;
-                            // 自然な座標に戻す。
                             // 指右移動 = 正のX、指上移動 = 負のY（画面空間）
                             state.x_delta.fetch_add(m.lLastX, Ordering::SeqCst);
+                            // タッチパッドの座標系に合わせて加算
                             state.y_delta.fetch_add(m.lLastY, Ordering::SeqCst);
                         }
+                        if m.ulRawButtons != 0 {
+                            event_detected = true;
+                        }
                     } else if raw.header.dwType == RIM_TYPEHID {
-                        // HID (タッチパッド/デジタイザ) の場合、レポートがあればアクティビティがあるとみなす
-                        // ただし注意が必要。
+                        // HID (タッチパッド/デジタイザ) のアクティビティ
                         event_detected = true;
                     }
 
@@ -286,6 +296,7 @@ impl TouchpadMonitor {
                         if let Ok(mut last_time) = state.last_touch_time.lock() {
                             *last_time = std::time::Instant::now();
                         }
+                        // 頻繁な emit を避けるため、状態が変化したときのみ emit するように改善検討余地あり
                         if let Ok(h) = state.app_handle.try_lock() {
                             if let Some(app) = &*h {
                                 let _ = app.emit("touchpad-status", true).ok();

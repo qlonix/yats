@@ -49,8 +49,13 @@ header {
 
 .title-group {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-direction: row;
+  align-items: center;
+  gap: 15px;
+}
+
+.yats-logo-svg {
+  filter: drop-shadow(0 0 5px rgba(0, 210, 255, 0.3));
 }
 
 h1 {
@@ -69,12 +74,19 @@ h1 {
   font-size: 0.9rem;
   color: rgba(255, 255, 255, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  width: 18px;
-  height: 18px;
-  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  min-height: 22px;
+  flex-shrink: 0;
+  display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
+  line-height: 1;
+  padding: 0;
+  box-sizing: border-box;
+  overflow: hidden;
   transition: all 0.2s;
 }
 
@@ -87,17 +99,81 @@ h1 {
 .header-controls {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
+}
+
+.header-control-label {
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.header-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 15px;
 }
 
 .header-control-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.75rem;
-  color: #888;
+  font-size: 0.8rem;
+  color: #aaa;
   cursor: pointer;
   user-select: none;
+  white-space: nowrap;
+}
+
+.scroll-sens-control {
+  min-width: 160px;
+}
+
+.scroll-sens-control input[type="range"] {
+  width: 100px;
+  height: 4px;
+  accent-color: #00d2ff;
+}
+
+.value-display {
+  display: inline-block;
+  width: 35px;
+  text-align: right;
+  font-family: 'JetBrains Mono', monospace;
+  color: #00d2ff;
+}
+
+.scroll-mini-info {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.3);
+  font-style: italic;
+}
+
+.info-tag {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.btn-global-config {
+  background: rgba(0, 210, 255, 0.1);
+  color: #00d2ff;
+  border: 1px solid rgba(0, 210, 255, 0.3);
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  transition: all 0.2s;
+  font-weight: 500;
+}
+
+.btn-global-config:hover {
+  background: rgba(0, 210, 255, 0.2);
+  border-color: #00d2ff;
+  box-shadow: 0 0 10px rgba(0, 210, 255, 0.2);
 }
 
 .header-control-item input[type="checkbox"] {

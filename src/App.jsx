@@ -217,6 +217,23 @@ const MacroRecorderModal = ({ mappingKey, onClose, onSaveMacro, existingSteps })
   );
 };
 
+const YatsLogo = () => (
+  <svg width="40" height="40" viewBox="0 0 1024 1024" className="yats-logo-svg">
+    <defs>
+      <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style={{ stopColor: "#00d2ff", stopOpacity: 1 }} />
+        <stop offset="100%" style={{ stopColor: "#3a7bd5", stopOpacity: 1 }} />
+      </linearGradient>
+    </defs>
+    <rect x="120" y="200" width="784" height="624" rx="80" fill="url(#logoGrad)" />
+    <rect x="220" y="300" width="180" height="180" rx="40" fill="white" />
+    <rect x="422" y="300" width="180" height="180" rx="40" fill="white" />
+    <rect x="624" y="300" width="180" height="180" rx="40" fill="white" />
+    <circle cx="512" cy="650" r="60" fill="none" stroke="white" strokeWidth="40" />
+    <circle cx="512" cy="650" r="20" fill="white" />
+  </svg>
+);
+
 function App() {
   const [mappings, setMappings] = useState({});
   const [isTouched, setIsTouched] = useState(false);
@@ -228,6 +245,9 @@ function App() {
   const [isPaused, setIsPaused] = useState(false);
   const [autoStart, setAutoStart] = useState(false);
   const [recordingMacroKey, setRecordingMacroKey] = useState(null);
+  const [showScrollSettings, setShowScrollSettings] = useState(false);
+  const [scrollSensitivity, setScrollSensitivity] = useState(100);
+  const [scrollInvert, setScrollInvert] = useState(false);
 
   useEffect(() => {
     invoke("get_config").then((config) => {
@@ -253,7 +273,9 @@ function App() {
         normalized[key] = entry;
       });
       setMappings(normalized);
-      setReleaseDelay(config.release_delay_ms || 200); // Default 200
+      setReleaseDelay(config.release_delay_ms || 200);
+      setScrollSensitivity(config.scroll_sensitivity || 100);
+      setScrollInvert(config.scroll_invert || false);
     });
 
     invoke("get_paused").then(setIsPaused);
@@ -264,6 +286,8 @@ function App() {
         setIsPaused(event.payload);
       });
     });
+
+    invoke("get_startup_status_cmd").then(setAutoStart);
 
     const interval = setInterval(() => {
       invoke("get_touch_status").then(setIsTouched);
@@ -281,14 +305,16 @@ function App() {
   const toggleAutoStart = (e) => {
     const newVal = e.target.checked;
     setAutoStart(newVal);
-    invoke("set_auto_start", { enable: newVal });
+    invoke("set_startup_cmd", { enabled: newVal });
   };
 
-  const saveConfig = (newMappings, newDelay) => {
+  const saveConfig = (newMappings, newDelay, newSens, newInvert) => {
     invoke("set_config", {
       newConfig: {
         mappings: newMappings || mappings,
-        release_delay_ms: newDelay !== undefined ? newDelay : releaseDelay
+        release_delay_ms: (newDelay !== null && newDelay !== undefined) ? newDelay : releaseDelay,
+        scroll_sensitivity: (newSens !== null && newSens !== undefined) ? newSens : scrollSensitivity,
+        scroll_invert: (newInvert !== null && newInvert !== undefined) ? newInvert : scrollInvert,
       }
     }).catch(console.error);
   };
@@ -372,7 +398,7 @@ function App() {
             <h2>About YATS</h2>
             <p><strong>YATS</strong> stands for:</p>
             <p className="yats-full-name">Yet Another Touchpad Shortcut</p>
-            <p className="version-info">Version 1.0.1</p>
+            <p className="version-info">Version 1.1.0</p>
             <button className="btn-close-modal" onClick={() => setShowAbout(false)}>Close</button>
           </div>
         </div>
@@ -400,26 +426,76 @@ function App() {
         />
       )}
 
+      {showScrollSettings && (
+        <div className="modal-overlay" onClick={() => setShowScrollSettings(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2>Global Scroll Settings</h2>
+            <div className="modal-body" style={{ padding: "20px 0" }}>
+              <div style={{ marginBottom: "20px" }}>
+                <label style={{ display: "block", marginBottom: "8px", fontSize: "0.9rem", color: "#888" }}>
+                  Sensitivity: <span className="value-display" style={{ fontSize: "1.1rem" }}>{scrollSensitivity}</span>%
+                </label>
+                <input
+                  type="range" min="0" max="100" step="1"
+                  style={{ width: "100%", height: "6px", accentColor: "#00d2ff" }}
+                  // v2.7.0: UI uses logarithmic mapping for better control at lower ranges. 
+                  // pos = 100 * log10(val) / 2
+                  value={Math.round(100 * Math.log10(scrollSensitivity) / 2)}
+                  onChange={(e) => {
+                    const pos = parseInt(e.target.value);
+                    // val = 100^(pos/100)
+                    const val = Math.round(Math.pow(100, pos / 100));
+                    setScrollSensitivity(val);
+                    saveConfig(null, null, val);
+                  }}
+                />
+                <p style={{ fontSize: "0.75rem", color: "#555", marginTop: "8px" }}>
+                  * This setting affects ALL scroll shortcuts. Control is finer at lower ranges.
+                </p>
+              </div>
+              <label className="header-control-item" style={{ fontSize: "1rem", color: "#e0e0e0", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  style={{ width: "18px", height: "18px" }}
+                  checked={scrollInvert}
+                  onChange={(e) => {
+                    const val = e.target.checked;
+                    setScrollInvert(val);
+                    saveConfig(null, null, null, val);
+                  }}
+                />
+                Invert Scroll Direction
+              </label>
+            </div>
+            <button className="btn-close-modal" onClick={() => setShowScrollSettings(false)}>Close</button>
+          </div>
+        </div>
+      )}
+
       <header>
         <div className="title-group">
-          <h1>YATS Settings v1.0.1 <span className="about-link" onClick={() => setShowAbout(true)}>?</span></h1>
+          <YatsLogo />
+          <h1>YATS Settings <span className="about-link" onClick={() => setShowAbout(true)}>?</span></h1>
           <div className="header-controls">
-            <label className="header-control-item">
-              <input type="checkbox" checked={autoStart} onChange={toggleAutoStart} />
-              Run on Startup
-            </label>
-            <label className="header-control-item delay-control">
-              Release Delay: {releaseDelay}ms
-              <input
-                type="range" min="10" max="1000" step="10"
-                value={releaseDelay}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value);
-                  setReleaseDelay(val);
-                  saveConfig(null, val);
-                }}
-              />
-            </label>
+            <label className="header-control-label">General:</label>
+            <div className="header-controls-row">
+              <label className="header-control-item">
+                <input type="checkbox" checked={autoStart} onChange={toggleAutoStart} />
+                Run on Startup
+              </label>
+              <label className="header-control-item delay-control">
+                Release Delay: <span className="value-display">{releaseDelay}</span>ms
+                <input
+                  type="range" min="10" max="1000" step="10"
+                  value={releaseDelay}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value);
+                    setReleaseDelay(val);
+                    saveConfig(null, val);
+                  }}
+                />
+              </label>
+            </div>
           </div>
         </div>
         <div className="status-container">
@@ -474,50 +550,9 @@ function App() {
                           </select>
                         )}
                         {action.type === "MouseScroll" && (
-                          <div className="scroll-mini-settings row">
-                            <div className="scroll-setting-item">
-                              <label>Sensitivity: <span style={{ display: "inline-block", width: "32px", textAlign: "right" }}>{(action.value?.sensitivity || 100) / 10}%</span></label>
-                              <input
-                                type="range" min="1" max="100" step="1"
-                                value={(() => {
-                                  // Logarithmic Inverse: Value -> Slider (1-100)
-                                  // y = A * exp(B*x) -> x = ln(y/A) / B
-                                  // Map 10-1000 to 1-100 slider
-                                  const minVal = 10;
-                                  const maxVal = 1000;
-                                  const val = Math.max(minVal, Math.min(action.value?.sensitivity || 100, maxVal));
-                                  const minLog = Math.log(minVal);
-                                  const maxLog = Math.log(maxVal);
-                                  const sliderVal = 1 + (Math.log(val) - minLog) / (maxLog - minLog) * 99;
-                                  return sliderVal;
-                                })()}
-                                onChange={(e) => {
-                                  // Logarithmic Forward: Slider -> Value (10-1000)
-                                  const sliderVal = parseFloat(e.target.value);
-                                  const minVal = 10;
-                                  const maxVal = 1000;
-                                  const minLog = Math.log(minVal);
-                                  const maxLog = Math.log(maxVal);
-                                  // value = exp(minLog + scale * (maxLog - minLog))
-                                  const scale = (sliderVal - 1) / 99;
-                                  const val = Math.exp(minLog + scale * (maxLog - minLog));
-                                  // Round to nearest 10 for clean numbers
-                                  const cleanVal = Math.round(val / 10) * 10;
-                                  updateAction(key, action.type, { ...action.value, sensitivity: cleanVal });
-                                }}
-                              />
-                            </div>
-                            <div className="scroll-setting-item checkbox">
-                              <label>
-                                <input
-                                  type="checkbox"
-                                  checked={action.value?.invert || false}
-                                  onChange={(e) => updateAction(key, action.type, { ...action.value, invert: e.target.checked })}
-                                />
-                                Invert
-                              </label>
-                            </div>
-                          </div>
+                          <button className="btn-global-config" onClick={() => setShowScrollSettings(true)}>
+                            Configure Global Scroll...
+                          </button>
                         )}
                         {action.type === "KeyMacro" && (
                           <div className="macro-inline-editor">

@@ -69,7 +69,9 @@ fn set_config(
     new_config: AppConfig,
 ) -> Result<(), String> {
     audit_log(&format!(
-        "[SYSTEM] Saving new config with {} mappings",
+        "[SYSTEM] Saving config: Sens={}, Invert={}, Mappings={}",
+        new_config.scroll_sensitivity,
+        new_config.scroll_invert,
         new_config.mappings.len()
     ));
     *config.write().unwrap() = new_config.clone();
@@ -146,31 +148,61 @@ fn set_paused_cmd(app: tauri::AppHandle, paused: bool) {
 
 #[tauri::command]
 fn set_startup_cmd(enabled: bool) -> Result<(), String> {
+    audit_log(&format!("[SYSTEM] Startup toggle requested: {}", enabled));
+
+    // 1. レジストリのクリーンアップ (古い方式の削除)
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    let path = r"Software\Microsoft\Windows\CurrentVersion\Run";
-    let (key, _) = hkcu.create_subkey(path).map_err(|e| e.to_string())?;
+    let reg_path = r"Software\Microsoft\Windows\CurrentVersion\Run";
+    if let Ok(key) = hkcu.open_subkey_with_flags(reg_path, winreg::enums::KEY_SET_VALUE) {
+        let _ = key.delete_value("YATS");
+    }
+
+    // 2. スタートアップフォルダへのショートカット処理
+    // %APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup
+    let app_data = std::env::var("APPDATA").map_err(|e| e.to_string())?;
+    let mut startup_path = std::path::PathBuf::from(app_data);
+    startup_path.push(r"Microsoft\Windows\Start Menu\Programs\Startup");
+    startup_path.push("YATS.lnk");
 
     if enabled {
         let exe_path = std::env::current_exe().map_err(|e| e.to_string())?;
-        key.set_value("YATS", &exe_path.to_str().unwrap())
+        let exe_str = exe_path.to_str().ok_or("Invalid exe path")?;
+        let lnk_str = startup_path.to_str().ok_or("Invalid shortcut path")?;
+
+        // PowerShellを使用してショートカットを作成
+        let script = format!(
+            "$s=(New-Object -ComObject WScript.Shell).CreateShortcut('{}');$s.TargetPath='{}';$s.Save()",
+            lnk_str, exe_str
+        );
+
+        use std::os::windows::process::CommandExt;
+        Command::new("powershell")
+            .args(&["-Command", &script])
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
+            .status()
             .map_err(|e| e.to_string())?;
+
+        audit_log("[SYSTEM] Startup shortcut created.");
     } else {
-        let _ = key.delete_value("YATS");
+        if startup_path.exists() {
+            std::fs::remove_file(startup_path).map_err(|e| e.to_string())?;
+            audit_log("[SYSTEM] Startup shortcut removed.");
+        }
     }
-    audit_log(&format!("[SYSTEM] Startup enabled: {}", enabled));
     Ok(())
 }
 
 #[tauri::command]
 fn get_startup_status_cmd() -> bool {
-    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    let path = r"Software\Microsoft\Windows\CurrentVersion\Run";
-    if let Ok(key) = hkcu.open_subkey(path) {
-        let val: String = key.get_value("YATS").unwrap_or_default();
-        !val.is_empty()
-    } else {
-        false
-    }
+    let app_data = match std::env::var("APPDATA") {
+        Ok(v) => v,
+        Err(_) => return false,
+    };
+    let mut startup_path = std::path::PathBuf::from(app_data);
+    startup_path.push(r"Microsoft\Windows\Start Menu\Programs\Startup");
+    startup_path.push("YATS.lnk");
+
+    startup_path.exists()
 }
 
 #[tauri::command]

@@ -44,24 +44,58 @@ pub enum Action {
 pub struct AppConfig {
     pub mappings: HashMap<Key, Action>,
     pub release_delay_ms: u64,
+    #[serde(default = "default_sensitivity")]
+    pub scroll_sensitivity: u32,
+    #[serde(default)]
+    pub scroll_invert: bool,
+}
+
+fn default_sensitivity() -> u32 {
+    100
 }
 
 impl Default for AppConfig {
     fn default() -> Self {
         let mut mappings = HashMap::new();
-        // デフォルトマッピング: F12 -> スクロール (標準感度)
+        // デフォルトマッピング (v2.4.0)
+        mappings.insert(Key::KeyD, Action::MouseClick(MouseButton::Right));
+        mappings.insert(Key::KeyF, Action::MouseClick(MouseButton::Left));
         mappings.insert(
-            Key::F12,
+            Key::KeyG,
+            Action::KeyMacro(vec![vec![Key::Alt, Key::LeftArrow]]),
+        );
+        mappings.insert(
+            Key::KeyH,
+            Action::KeyMacro(vec![vec![Key::Alt, Key::RightArrow]]),
+        );
+        mappings.insert(Key::KeyJ, Action::MouseClick(MouseButton::Left));
+        mappings.insert(Key::KeyK, Action::MouseClick(MouseButton::Right));
+        mappings.insert(
+            Key::KeyL,
             Action::MouseScroll(ScrollConfig {
                 sensitivity: 100,
                 invert: false,
                 acceleration: false,
             }),
         );
+        mappings.insert(Key::KeyQ, Action::Window(WindowAction::Close));
+        mappings.insert(Key::KeyR, Action::Window(WindowAction::Maximize));
+        mappings.insert(
+            Key::KeyS,
+            Action::MouseScroll(ScrollConfig {
+                sensitivity: 100,
+                invert: false,
+                acceleration: false,
+            }),
+        );
+        mappings.insert(Key::KeyV, Action::MouseDoubleClick(MouseButton::Left));
+        mappings.insert(Key::KeyW, Action::Window(WindowAction::Minimize));
 
         Self {
             mappings,
             release_delay_ms: 200,
+            scroll_sensitivity: 100,
+            scroll_invert: false,
         }
     }
 }
