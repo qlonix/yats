@@ -1,5 +1,6 @@
 use crate::config::{Action, AppConfig, MouseButton, ScrollConfig, WindowAction};
 use crate::touchpad_monitor::TouchpadMonitor;
+#[cfg(target_os = "linux")]
 use enigo::{Button, Coordinate, Direction, Enigo, Keyboard, Mouse, Settings};
 use rdev::{simulate, EventType};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -95,8 +96,8 @@ fn send_key_click(vk: u16, pressed: bool) {
     // For now, we use a simple approach.
     use enigo::Key;
     let key = match vk {
-        0xA6 => Key::BrowserBack,
-        0xA7 => Key::BrowserForward,
+        0xA6 => Key::Raw(0xA6),
+        0xA7 => Key::Raw(0xA7),
         _ => return,
     };
     let mut enigo = Enigo::new(&Settings::default()).unwrap();

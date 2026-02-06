@@ -1,5 +1,6 @@
 use crate::audit_log;
 use std::collections::HashMap;
+#[cfg(target_os = "windows")]
 use std::ptr::null_mut;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};

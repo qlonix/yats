@@ -8,6 +8,7 @@ use crate::touchpad_monitor::TouchpadMonitor;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
+#[cfg(target_os = "windows")]
 use std::process::Command;
 use std::sync::atomic::Ordering;
 use std::sync::mpsc::{channel, Sender};
@@ -265,12 +266,6 @@ fn get_startup_status_cmd() -> bool {
     desktop_file.push("yats.desktop");
 
     desktop_file.exists()
-}
-
-#[cfg(target_os = "windows")]
-#[tauri::command]
-fn dump_registry_skipped() -> Result<String, String> {
-    Ok("Skipped on Linux".to_string())
 }
 
 #[cfg(target_os = "windows")]
