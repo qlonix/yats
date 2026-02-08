@@ -310,10 +310,29 @@ select {
   width: 100%;
   font-size: 0.8rem;
   cursor: pointer;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23888' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 28px;
 }
 
 select:hover {
   border-color: rgba(0, 210, 255, 0.3);
+}
+
+select option {
+  background: #1e2227;
+  color: #e0e0e0;
+  padding: 8px;
+}
+
+select option:hover,
+select option:checked {
+  background: #2c313a;
+  color: #00d2ff;
 }
 
 .scroll-area {

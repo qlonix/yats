@@ -249,28 +249,55 @@ impl TouchpadMonitor {
                 for entry in dir.flatten() {
                     let path = entry.path();
                     if path.to_string_lossy().contains("event") {
-                        if let Ok(device) = Device::open(&path) {
-                            let name = device.name().unwrap_or("Unknown");
-                            let is_touchpad = name.to_lowercase().contains("touchpad")
-                                || (device.supported_events().contains(EventType::ABSOLUTE)
+                        match Device::open(&path) {
+                            Ok(device) => {
+                                let name = device.name().unwrap_or("Unknown").to_lowercase();
+
+                                // Extended detection: check for common touchpad-related keywords
+                                let touchpad_keywords = [
+                                    "touchpad",
+                                    "glidepoint",
+                                    "trackpad",
+                                    "synaptics",
+                                    "elan",
+                                    "dtp",
+                                    "alps",
+                                    "touch",
+                                ];
+                                let name_match = touchpad_keywords.iter().any(|k| name.contains(k));
+
+                                // Also check for absolute axis support (common for touchpads)
+                                let has_abs = device
+                                    .supported_events()
+                                    .contains(EventType::ABSOLUTE)
                                     && device.supported_absolute_axes().map_or(false, |axes| {
                                         axes.contains(AbsoluteAxisType::ABS_X)
-                                    }));
+                                            || axes.contains(AbsoluteAxisType::ABS_MT_POSITION_X)
+                                    });
 
-                            if is_touchpad {
+                                if name_match || has_abs {
+                                    audit_log(&format!(
+                                        "[MONITOR] Found Touchpad: '{}' at {:?} (name_match={}, has_abs={})",
+                                        device.name().unwrap_or("Unknown"), path, name_match, has_abs
+                                    ));
+                                    devices.push(device);
+                                }
+                            }
+                            Err(e) => {
                                 audit_log(&format!(
-                                    "[MONITOR] Found Touchpad: {} at {:?}",
-                                    name, path
+                                    "[MONITOR] Cannot open {:?}: {} (permission issue?)",
+                                    path, e
                                 ));
-                                devices.push(device);
                             }
                         }
                     }
                 }
+            } else {
+                audit_log("[MONITOR] Cannot read /dev/input directory. Permission denied?");
             }
 
             if devices.is_empty() {
-                audit_log("[MONITOR] No touchpad found, retrying in 5s...");
+                audit_log("[MONITOR] No touchpad found. Ensure user is in 'input' group. Retrying in 5s...");
                 std::thread::sleep(std::time::Duration::from_secs(5));
                 continue;
             }
