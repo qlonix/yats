@@ -28,7 +28,9 @@
     "active": true,
     "targets": [
       "nsis",
-      "msi"
+      "msi",
+      "deb",
+      "appimage"
     ],
     "publisher": "Antigravity",
     "icon": [

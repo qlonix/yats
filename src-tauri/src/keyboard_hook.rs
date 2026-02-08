@@ -30,6 +30,7 @@ pub enum RemapCommand {
     UpdateScroll(Option<ScrollConfig>),
 }
 
+#[cfg(target_os = "windows")]
 const INPUT_KEYBOARD: u32 = 1;
 
 // v0.4.7: ブラウザナビゲーション用仮想キー定数
