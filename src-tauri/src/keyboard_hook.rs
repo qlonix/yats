@@ -1,7 +1,7 @@
 use crate::config::{Action, AppConfig, MouseButton, ScrollConfig, WindowAction};
 use crate::touchpad_monitor::TouchpadMonitor;
 #[cfg(target_os = "linux")]
-use enigo::{Button, Coordinate, Direction, Enigo, Keyboard, Mouse, Settings};
+use enigo::{Button, Coordinate, Direction, Enigo, Mouse, Settings};
 use rdev::{simulate, EventType};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -92,21 +92,21 @@ fn send_key_click(vk: u16, pressed: bool) {
 
 #[cfg(target_os = "linux")]
 fn send_key_click(vk: u16, pressed: bool) {
-    // Note: Linux mapping for browser keys via Enigo/X11 might need more specific handling
-    // For now, we use a simple approach.
-    use enigo::Key;
-    let key = match vk {
-        0xA6 => Key::Raw(0xA6),
-        0xA7 => Key::Raw(0xA7),
+    use rdev::{simulate, EventType, Key};
+    let keys = match vk {
+        0xA6 => vec![Key::Alt, Key::LeftArrow],
+        0xA7 => vec![Key::Alt, Key::RightArrow],
         _ => return,
     };
-    let mut enigo = Enigo::new(&Settings::default()).unwrap();
-    let direction = if pressed {
-        Direction::Press
+    if pressed {
+        for &k in &keys {
+            let _ = simulate(&EventType::KeyPress(k));
+        }
     } else {
-        Direction::Release
-    };
-    let _ = enigo.key(key, direction);
+        for &k in keys.iter().rev() {
+            let _ = simulate(&EventType::KeyRelease(k));
+        }
+    }
 }
 
 #[cfg(target_os = "windows")]
