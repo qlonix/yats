@@ -62,9 +62,20 @@ impl TouchpadMonitor {
         });
 
         let state_clone = Arc::clone(&state);
-        std::thread::spawn(move || {
-            Self::run_monitor(state_clone);
-        });
+        std::thread::Builder::new()
+            .name("touchpad-monitor".to_string())
+            .spawn(move || {
+                audit_log("[MONITOR] Monitor thread spawned successfully");
+                if let Err(e) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    Self::run_monitor(state_clone);
+                })) {
+                    audit_log(&format!("[MONITOR] PANIC in monitor thread: {:?}", e));
+                }
+            })
+            .unwrap_or_else(|e| {
+                audit_log(&format!("[MONITOR] Failed to spawn monitor thread: {}", e));
+                std::thread::spawn(|| {})
+            });
 
         let state_watch = Arc::clone(&state);
         std::thread::spawn(move || loop {
