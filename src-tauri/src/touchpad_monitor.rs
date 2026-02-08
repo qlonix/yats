@@ -46,6 +46,7 @@ pub struct TouchpadMonitor {
 
 impl TouchpadMonitor {
     pub fn new(app_handle: Arc<Mutex<Option<AppHandle>>>) -> Self {
+        audit_log("[MONITOR] TouchpadMonitor::new() called - initializing");
         let state = Arc::new(MonitorState {
             is_touched: AtomicBool::new(false),
             last_touch_time: Mutex::new(
