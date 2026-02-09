@@ -273,7 +273,25 @@ impl TouchpadMonitor {
                             Ok(device) => {
                                 let name = device.name().unwrap_or("Unknown").to_lowercase();
 
-                                // Extended detection: check for common touchpad-related keywords
+                                // Exclusion keywords: skip devices that are clearly not touchpads
+                                let exclude_keywords = [
+                                    "keyboard",
+                                    "kbd",
+                                    "mouse",
+                                    "button",
+                                    "power",
+                                    "speaker",
+                                    "headphone",
+                                    "video",
+                                    "camera",
+                                    "webcam",
+                                    "consumer",
+                                    "wireless",
+                                    "virtual",
+                                ];
+                                let is_excluded = exclude_keywords.iter().any(|k| name.contains(k));
+
+                                // Touchpad-specific keywords
                                 let touchpad_keywords = [
                                     "touchpad",
                                     "glidepoint",
@@ -282,25 +300,42 @@ impl TouchpadMonitor {
                                     "elan",
                                     "dtp",
                                     "alps",
-                                    "touch",
+                                    "focaltech",
+                                    "hantick",
+                                    "goodix",
+                                    "i2c-hid", // Many modern touchpads use i2c
                                 ];
                                 let name_match = touchpad_keywords.iter().any(|k| name.contains(k));
 
-                                // Also check for absolute axis support (common for touchpads)
-                                let has_abs = device
-                                    .supported_events()
-                                    .contains(EventType::ABSOLUTE)
-                                    && device.supported_absolute_axes().map_or(false, |axes| {
-                                        axes.contains(AbsoluteAxisType::ABS_X)
-                                            || axes.contains(AbsoluteAxisType::ABS_MT_POSITION_X)
-                                    });
+                                // Check for absolute axis support with multi-touch (more specific to touchpads)
+                                let has_abs =
+                                    device.supported_events().contains(EventType::ABSOLUTE)
+                                        && device.supported_absolute_axes().map_or(false, |axes| {
+                                            // Prefer multi-touch (ABS_MT_*) as it's more specific to touchpads
+                                            axes.contains(AbsoluteAxisType::ABS_MT_POSITION_X)
+                                                || (axes.contains(AbsoluteAxisType::ABS_X)
+                                                    && axes.contains(AbsoluteAxisType::ABS_Y))
+                                        });
 
-                                if name_match || has_abs {
+                                // Only accept if:
+                                // 1. Name matches AND not excluded, OR
+                                // 2. Name matches (touchpad keyword is strong enough)
+                                let is_touchpad = !is_excluded
+                                    && (name_match || (has_abs && name.contains("touch")));
+
+                                if is_touchpad {
                                     audit_log(&format!(
                                         "[MONITOR] Found Touchpad: '{}' at {:?} (name_match={}, has_abs={})",
                                         device.name().unwrap_or("Unknown"), path, name_match, has_abs
                                     ));
                                     devices.push(device);
+                                } else if has_abs && !is_excluded {
+                                    // Log devices that have ABS but weren't selected (for debugging)
+                                    audit_log(&format!(
+                                        "[MONITOR] Skipped device with ABS: '{}' at {:?}",
+                                        device.name().unwrap_or("Unknown"),
+                                        path
+                                    ));
                                 }
                             }
                             Err(e) => {
