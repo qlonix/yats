@@ -304,6 +304,7 @@ impl TouchpadMonitor {
                                     "hantick",
                                     "goodix",
                                     "i2c-hid", // Many modern touchpads use i2c
+                                    "bcm5974", // Apple MacBook touchpad driver
                                 ];
                                 let name_match = touchpad_keywords.iter().any(|k| name.contains(k));
 
