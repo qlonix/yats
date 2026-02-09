@@ -66,7 +66,14 @@ impl TouchpadMonitor {
         std::thread::Builder::new()
             .name("touchpad-monitor".to_string())
             .spawn(move || {
-                audit_log("[MONITOR] Monitor thread spawned successfully");
+                // Wait for LOG_PATH to be initialized (set in Tauri's setup hook)
+                for _ in 0..50 {
+                    // Try to log - if it works, LOG_PATH is ready
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                }
+
+                audit_log("[MONITOR] Monitor thread started after initialization delay");
+
                 if let Err(e) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                     Self::run_monitor(state_clone);
                 })) {
@@ -74,7 +81,8 @@ impl TouchpadMonitor {
                 }
             })
             .unwrap_or_else(|e| {
-                audit_log(&format!("[MONITOR] Failed to spawn monitor thread: {}", e));
+                // Can't use audit_log here as LOG_PATH might not be set
+                eprintln!("[MONITOR] Failed to spawn monitor thread: {}", e);
                 std::thread::spawn(|| {})
             });
 
