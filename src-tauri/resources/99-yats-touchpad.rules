@@ -12,3 +12,8 @@ SUBSYSTEM=="input", KERNEL=="event[0-9]*", ATTRS{name}=="*ELAN*", MODE="0666"
 SUBSYSTEM=="input", KERNEL=="event[0-9]*", ATTRS{name}=="*ALPS*", MODE="0666"
 SUBSYSTEM=="input", KERNEL=="event[0-9]*", ATTRS{name}=="*DTP*", MODE="0666"
 SUBSYSTEM=="input", KERNEL=="event[0-9]*", ATTRS{name}=="*bcm5974*", MODE="0666"
+
+# Allow access to keyboard devices (required for key remapping)
+SUBSYSTEM=="input", KERNEL=="event[0-9]*", ATTRS{name}=="*[Kk]eyboard*", MODE="0666"
+SUBSYSTEM=="input", KERNEL=="event[0-9]*", ATTRS{name}=="*AT Translated*", MODE="0666"
+SUBSYSTEM=="input", KERNEL=="event[0-9]*", ATTRS{name}=="*Apple*Keyboard*", MODE="0666"
