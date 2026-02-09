@@ -382,15 +382,22 @@ impl TouchpadMonitor {
                                     // Handle ABSOLUTE axis events (typical for touchpads)
                                     if ev.event_type() == EventType::ABSOLUTE {
                                         // ABS_X = 0, ABS_Y = 1
+                                        // Max delta threshold to filter out erratic jumps (e.g., finger lift/place)
+                                        const MAX_DELTA: i32 = 200;
+
                                         match ev.code() {
                                             0 => {
                                                 // ABS_X
                                                 if let Some(last_x) = last_abs_x {
                                                     let delta = ev.value() - last_x;
-                                                    // Scale down absolute delta (touchpads have high resolution)
-                                                    s_clone
-                                                        .x_delta
-                                                        .fetch_add(delta / 10, Ordering::SeqCst);
+                                                    // Filter out large jumps (likely finger repositioning)
+                                                    if delta.abs() < MAX_DELTA {
+                                                        // Scale down and clamp for smoother scrolling
+                                                        let scaled = (delta / 15).clamp(-50, 50);
+                                                        s_clone
+                                                            .x_delta
+                                                            .fetch_add(scaled, Ordering::SeqCst);
+                                                    }
                                                 }
                                                 last_abs_x = Some(ev.value());
                                             }
@@ -398,10 +405,14 @@ impl TouchpadMonitor {
                                                 // ABS_Y
                                                 if let Some(last_y) = last_abs_y {
                                                     let delta = ev.value() - last_y;
-                                                    // Scale down absolute delta
-                                                    s_clone
-                                                        .y_delta
-                                                        .fetch_add(delta / 10, Ordering::SeqCst);
+                                                    // Filter out large jumps (likely finger repositioning)
+                                                    if delta.abs() < MAX_DELTA {
+                                                        // Scale down and clamp for smoother scrolling
+                                                        let scaled = (delta / 15).clamp(-50, 50);
+                                                        s_clone
+                                                            .y_delta
+                                                            .fetch_add(scaled, Ordering::SeqCst);
+                                                    }
                                                 }
                                                 last_abs_y = Some(ev.value());
                                             }
