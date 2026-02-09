@@ -402,6 +402,7 @@ impl KeyboardHook {
     }
 
     pub fn start(&self) {
+        crate::audit_log("[HOOK] Starting keyboard hook (rdev::grab)...");
         let tx = self.tx.clone();
         let config_ref = Arc::clone(&self.config);
         let monitor_ref = Arc::clone(&self.monitor);
@@ -477,7 +478,9 @@ impl KeyboardHook {
             }
             Some(event)
         }) {
-            eprintln!("Error: {:?}", e);
+            crate::audit_log(&format!("[HOOK] rdev::grab error: {:?}", e));
+            eprintln!("[HOOK] Error: {:?}", e);
         }
+        crate::audit_log("[HOOK] Keyboard hook exited");
     }
 }
