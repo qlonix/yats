@@ -387,28 +387,27 @@ impl TouchpadMonitor {
                                     // Handle ABSOLUTE axis events (typical for touchpads)
                                     if ev.event_type() == EventType::ABSOLUTE {
                                         // Constants for filtering
-                                        const MAX_DELTA: i32 = 150; // Filter out finger lifts
-                                        const DEADZONE: i32 = 3; // Ignore very small movements
-                                        const OUTPUT_THRESHOLD: i32 = 8; // Accumulate before outputting
-                                        const DIRECTION_CHANGE_THRESHOLD: i32 = 15; // Hysteresis for direction change
+                                        const JUMP_THRESHOLD: i32 = 100; // Detect finger repositioning
+                                        const DEADZONE: i32 = 5; // Ignore noise
 
                                         match ev.code() {
                                             0 => {
                                                 // ABS_X
                                                 if let Some(last_x) = last_abs_x {
                                                     let delta = ev.value() - last_x;
-                                                    if delta.abs() < MAX_DELTA
-                                                        && delta.abs() > DEADZONE
-                                                    {
-                                                        accum_x += delta / 3;
-                                                        if accum_x.abs() >= OUTPUT_THRESHOLD {
-                                                            let output =
-                                                                (accum_x / 2).clamp(-20, 20);
+                                                    if delta.abs() >= JUMP_THRESHOLD {
+                                                        // Large jump = finger lift/place, reset tracking
+                                                        accum_x = 0;
+                                                        accum_y = 0;
+                                                        last_dir_y = 0;
+                                                    } else if delta.abs() > DEADZONE {
+                                                        // Normal movement - simple proportional scroll
+                                                        let scaled = delta / 8;
+                                                        if scaled != 0 {
                                                             s_clone.x_delta.fetch_add(
-                                                                output,
+                                                                scaled,
                                                                 Ordering::SeqCst,
                                                             );
-                                                            accum_x = 0;
                                                         }
                                                     }
                                                 }
@@ -418,34 +417,19 @@ impl TouchpadMonitor {
                                                 // ABS_Y
                                                 if let Some(last_y) = last_abs_y {
                                                     let delta = ev.value() - last_y;
-                                                    if delta.abs() < MAX_DELTA
-                                                        && delta.abs() > DEADZONE
-                                                    {
-                                                        let new_dir =
-                                                            if delta > 0 { 1 } else { -1 };
-
-                                                        // Direction hysteresis: require more movement to change direction
-                                                        if new_dir == last_dir_y || last_dir_y == 0
-                                                        {
-                                                            accum_y += delta / 3;
-                                                        } else if delta.abs()
-                                                            > DIRECTION_CHANGE_THRESHOLD
-                                                        {
-                                                            // Direction change allowed only with significant movement
-                                                            accum_y = delta / 3;
-                                                            last_dir_y = new_dir;
-                                                        }
-                                                        // Otherwise ignore (prevents jitter)
-
-                                                        if accum_y.abs() >= OUTPUT_THRESHOLD {
-                                                            let output =
-                                                                (accum_y / 2).clamp(-20, 20);
+                                                    if delta.abs() >= JUMP_THRESHOLD {
+                                                        // Large jump = finger lift/place, reset tracking
+                                                        accum_x = 0;
+                                                        accum_y = 0;
+                                                        last_dir_y = 0;
+                                                    } else if delta.abs() > DEADZONE {
+                                                        // Normal movement - simple proportional scroll
+                                                        let scaled = delta / 8;
+                                                        if scaled != 0 {
                                                             s_clone.y_delta.fetch_add(
-                                                                output,
+                                                                scaled,
                                                                 Ordering::SeqCst,
                                                             );
-                                                            accum_y = 0;
-                                                            last_dir_y = new_dir;
                                                         }
                                                     }
                                                 }
