@@ -392,8 +392,9 @@ impl TouchpadMonitor {
                                                     let delta = ev.value() - last_x;
                                                     // Filter out large jumps (likely finger repositioning)
                                                     if delta.abs() < MAX_DELTA {
-                                                        // Scale down and clamp for smoother scrolling
-                                                        let scaled = (delta / 15).clamp(-50, 50);
+                                                        // Scale down but preserve small movements
+                                                        // Use smaller divisor to keep fine-grained control
+                                                        let scaled = (delta / 5).clamp(-30, 30);
                                                         s_clone
                                                             .x_delta
                                                             .fetch_add(scaled, Ordering::SeqCst);
@@ -407,8 +408,8 @@ impl TouchpadMonitor {
                                                     let delta = ev.value() - last_y;
                                                     // Filter out large jumps (likely finger repositioning)
                                                     if delta.abs() < MAX_DELTA {
-                                                        // Scale down and clamp for smoother scrolling
-                                                        let scaled = (delta / 15).clamp(-50, 50);
+                                                        // Scale down but preserve small movements
+                                                        let scaled = (delta / 5).clamp(-30, 30);
                                                         s_clone
                                                             .y_delta
                                                             .fetch_add(scaled, Ordering::SeqCst);
