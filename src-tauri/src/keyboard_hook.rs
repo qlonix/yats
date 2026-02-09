@@ -129,12 +129,19 @@ fn send_mouse_scroll(delta: i32) {
 
 #[cfg(target_os = "linux")]
 fn send_mouse_scroll(delta: i32) {
-    let mut enigo = Enigo::new(&Settings::default()).unwrap();
-    // Enigo's scroll uses 'length', positive is up/right.
-    // We divide by a factor to match the Windows sensitivity roughly on Linux.
-    let scroll_amount = delta / 20;
-    if scroll_amount != 0 {
-        let _ = enigo.scroll(scroll_amount, enigo::Axis::Vertical);
+    use rdev::{simulate, EventType};
+    // Use rdev for scroll as enigo scroll can be unreliable
+    // delta is expected to be raw wheel delta, we convert to scroll events
+    let scroll_count = delta / 30; // Adjust divisor for sensitivity
+    if scroll_count != 0 {
+        for _ in 0..scroll_count.abs() {
+            let delta_y = if scroll_count > 0 { 1 } else { -1 };
+            let _ = simulate(&EventType::Wheel {
+                delta_x: 0,
+                delta_y: delta_y as i64,
+            });
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
     }
 }
 
@@ -225,15 +232,16 @@ fn execute_action(action: Action, pressed: bool) {
                 #[cfg(target_os = "linux")]
                 {
                     use std::process::Command;
-                    let arg = match win_act {
-                        WindowAction::Close => "windowclose",
-                        WindowAction::Minimize => "windowminimize",
-                        WindowAction::Maximize => "windowsize --usehints %1 100% 100%", // Simplified maximize
+                    // xdotool requires piping: get window ID then perform action
+                    let cmd = match win_act {
+                        WindowAction::Close => "xdotool getactivewindow windowclose",
+                        WindowAction::Minimize => "xdotool getactivewindow windowminimize",
+                        WindowAction::Maximize => {
+                            "wmctrl -r :ACTIVE: -b toggle,maximized_vert,maximized_horz"
+                        }
                     };
-                    // Using xdotool for window management on X11
-                    let _ = Command::new("xdotool")
-                        .args(&["getactivewindow", arg])
-                        .status();
+                    // Use sh -c to execute as shell command
+                    let _ = Command::new("sh").args(&["-c", cmd]).status();
                 }
             }
         }
