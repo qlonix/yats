@@ -366,6 +366,11 @@ impl TouchpadMonitor {
                     // Track last known absolute position for delta computation
                     let mut last_abs_x: Option<i32> = None;
                     let mut last_abs_y: Option<i32> = None;
+                    // Accumulator for smoothing small movements
+                    let mut accum_x: i32 = 0;
+                    let mut accum_y: i32 = 0;
+                    // Direction tracking for hysteresis (-1, 0, 1)
+                    let mut last_dir_y: i32 = 0;
 
                     loop {
                         if let Ok(events) = device.fetch_events() {
@@ -381,23 +386,30 @@ impl TouchpadMonitor {
 
                                     // Handle ABSOLUTE axis events (typical for touchpads)
                                     if ev.event_type() == EventType::ABSOLUTE {
-                                        // ABS_X = 0, ABS_Y = 1
-                                        // Max delta threshold to filter out erratic jumps (e.g., finger lift/place)
-                                        const MAX_DELTA: i32 = 200;
+                                        // Constants for filtering
+                                        const MAX_DELTA: i32 = 150; // Filter out finger lifts
+                                        const DEADZONE: i32 = 3; // Ignore very small movements
+                                        const OUTPUT_THRESHOLD: i32 = 8; // Accumulate before outputting
+                                        const DIRECTION_CHANGE_THRESHOLD: i32 = 15; // Hysteresis for direction change
 
                                         match ev.code() {
                                             0 => {
                                                 // ABS_X
                                                 if let Some(last_x) = last_abs_x {
                                                     let delta = ev.value() - last_x;
-                                                    // Filter out large jumps (likely finger repositioning)
-                                                    if delta.abs() < MAX_DELTA {
-                                                        // Scale down but preserve small movements
-                                                        // Use smaller divisor to keep fine-grained control
-                                                        let scaled = (delta / 5).clamp(-30, 30);
-                                                        s_clone
-                                                            .x_delta
-                                                            .fetch_add(scaled, Ordering::SeqCst);
+                                                    if delta.abs() < MAX_DELTA
+                                                        && delta.abs() > DEADZONE
+                                                    {
+                                                        accum_x += delta / 3;
+                                                        if accum_x.abs() >= OUTPUT_THRESHOLD {
+                                                            let output =
+                                                                (accum_x / 2).clamp(-20, 20);
+                                                            s_clone.x_delta.fetch_add(
+                                                                output,
+                                                                Ordering::SeqCst,
+                                                            );
+                                                            accum_x = 0;
+                                                        }
                                                     }
                                                 }
                                                 last_abs_x = Some(ev.value());
@@ -406,13 +418,35 @@ impl TouchpadMonitor {
                                                 // ABS_Y
                                                 if let Some(last_y) = last_abs_y {
                                                     let delta = ev.value() - last_y;
-                                                    // Filter out large jumps (likely finger repositioning)
-                                                    if delta.abs() < MAX_DELTA {
-                                                        // Scale down but preserve small movements
-                                                        let scaled = (delta / 5).clamp(-30, 30);
-                                                        s_clone
-                                                            .y_delta
-                                                            .fetch_add(scaled, Ordering::SeqCst);
+                                                    if delta.abs() < MAX_DELTA
+                                                        && delta.abs() > DEADZONE
+                                                    {
+                                                        let new_dir =
+                                                            if delta > 0 { 1 } else { -1 };
+
+                                                        // Direction hysteresis: require more movement to change direction
+                                                        if new_dir == last_dir_y || last_dir_y == 0
+                                                        {
+                                                            accum_y += delta / 3;
+                                                        } else if delta.abs()
+                                                            > DIRECTION_CHANGE_THRESHOLD
+                                                        {
+                                                            // Direction change allowed only with significant movement
+                                                            accum_y = delta / 3;
+                                                            last_dir_y = new_dir;
+                                                        }
+                                                        // Otherwise ignore (prevents jitter)
+
+                                                        if accum_y.abs() >= OUTPUT_THRESHOLD {
+                                                            let output =
+                                                                (accum_y / 2).clamp(-20, 20);
+                                                            s_clone.y_delta.fetch_add(
+                                                                output,
+                                                                Ordering::SeqCst,
+                                                            );
+                                                            accum_y = 0;
+                                                            last_dir_y = new_dir;
+                                                        }
                                                     }
                                                 }
                                                 last_abs_y = Some(ev.value());
