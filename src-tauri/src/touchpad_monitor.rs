@@ -479,9 +479,12 @@ impl TouchpadMonitor {
                                         && ev.code() == 330
                                         && ev.value() == 0
                                     {
-                                        // BTN_TOUCH released - reset position tracking
+                                        // BTN_TOUCH released - reset all tracking state
                                         last_abs_x = None;
                                         last_abs_y = None;
+                                        accum_x = 0;
+                                        accum_y = 0;
+                                        last_dir_y = 0;
                                     }
 
                                     // UI Update
