@@ -327,6 +327,10 @@ impl TouchpadMonitor {
             for mut device in devices {
                 let s_clone = Arc::clone(&state);
                 threads.push(std::thread::spawn(move || {
+                    // Track last known absolute position for delta computation
+                    let mut last_abs_x: Option<i32> = None;
+                    let mut last_abs_y: Option<i32> = None;
+
                     loop {
                         if let Ok(events) = device.fetch_events() {
                             for ev in events {
@@ -339,21 +343,63 @@ impl TouchpadMonitor {
                                         *last_time = std::time::Instant::now();
                                     }
 
-                                    // Handle relative movement for scrolling
+                                    // Handle ABSOLUTE axis events (typical for touchpads)
+                                    if ev.event_type() == EventType::ABSOLUTE {
+                                        // ABS_X = 0, ABS_Y = 1
+                                        match ev.code() {
+                                            0 => {
+                                                // ABS_X
+                                                if let Some(last_x) = last_abs_x {
+                                                    let delta = ev.value() - last_x;
+                                                    // Scale down absolute delta (touchpads have high resolution)
+                                                    s_clone
+                                                        .x_delta
+                                                        .fetch_add(delta / 10, Ordering::SeqCst);
+                                                }
+                                                last_abs_x = Some(ev.value());
+                                            }
+                                            1 => {
+                                                // ABS_Y
+                                                if let Some(last_y) = last_abs_y {
+                                                    let delta = ev.value() - last_y;
+                                                    // Scale down absolute delta
+                                                    s_clone
+                                                        .y_delta
+                                                        .fetch_add(delta / 10, Ordering::SeqCst);
+                                                }
+                                                last_abs_y = Some(ev.value());
+                                            }
+                                            _ => {}
+                                        }
+                                    }
+
+                                    // Handle RELATIVE movement (some touchpads may send this)
                                     if ev.event_type() == EventType::RELATIVE {
                                         match ev.code() {
                                             0 => {
+                                                // REL_X
                                                 s_clone
                                                     .x_delta
                                                     .fetch_add(ev.value(), Ordering::SeqCst);
-                                            } // REL_X
+                                            }
                                             1 => {
+                                                // REL_Y
                                                 s_clone
                                                     .y_delta
                                                     .fetch_add(ev.value(), Ordering::SeqCst);
-                                            } // REL_Y
+                                            }
                                             _ => {}
                                         }
+                                    }
+
+                                    // Reset absolute tracking on finger lift (KEY event with BTN_TOUCH = 0)
+                                    if ev.event_type() == EventType::KEY
+                                        && ev.code() == 330
+                                        && ev.value() == 0
+                                    {
+                                        // BTN_TOUCH released - reset position tracking
+                                        last_abs_x = None;
+                                        last_abs_y = None;
                                     }
 
                                     // UI Update

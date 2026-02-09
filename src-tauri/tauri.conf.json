@@ -45,6 +45,10 @@
     ],
     "linux": {
       "deb": {
+        "depends": [
+          "xdotool",
+          "wmctrl"
+        ],
         "files": {
           "/etc/udev/rules.d/99-yats-touchpad.rules": "resources/99-yats-touchpad.rules"
         }
