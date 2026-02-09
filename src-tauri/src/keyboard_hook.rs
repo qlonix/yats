@@ -130,18 +130,15 @@ fn send_mouse_scroll(delta: i32) {
 #[cfg(target_os = "linux")]
 fn send_mouse_scroll(delta: i32) {
     use rdev::{simulate, EventType};
-    // Use rdev for scroll as enigo scroll can be unreliable
-    // delta is expected to be raw wheel delta, we convert to scroll events
-    let scroll_count = delta / 30; // Adjust divisor for sensitivity
-    if scroll_count != 0 {
-        for _ in 0..scroll_count.abs() {
-            let delta_y = if scroll_count > 0 { 1 } else { -1 };
-            let _ = simulate(&EventType::Wheel {
-                delta_x: 0,
-                delta_y: delta_y as i64,
-            });
-            std::thread::sleep(std::time::Duration::from_millis(5));
-        }
+    // Pass delta directly for linear scroll movement like Windows
+    // rdev uses delta_y where positive = scroll up, negative = scroll down
+    // Scale factor adjusted for Linux scroll feel
+    let scaled_delta = delta / 8; // Adjust divisor for sensitivity
+    if scaled_delta != 0 {
+        let _ = simulate(&EventType::Wheel {
+            delta_x: 0,
+            delta_y: scaled_delta as i64,
+        });
     }
 }
 
