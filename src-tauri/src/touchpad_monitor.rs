@@ -386,9 +386,8 @@ impl TouchpadMonitor {
 
                                     // Handle ABSOLUTE axis events (typical for touchpads)
                                     if ev.event_type() == EventType::ABSOLUTE {
-                                        // Constants for filtering
                                         const JUMP_THRESHOLD: i32 = 100; // Detect finger repositioning
-                                        const DEADZONE: i32 = 5; // Ignore noise
+                                        const ACCUM_THRESHOLD: i32 = 8; // Accumulate small movements
 
                                         match ev.code() {
                                             0 => {
@@ -396,18 +395,32 @@ impl TouchpadMonitor {
                                                 if let Some(last_x) = last_abs_x {
                                                     let delta = ev.value() - last_x;
                                                     if delta.abs() >= JUMP_THRESHOLD {
-                                                        // Large jump = finger lift/place, reset tracking
                                                         accum_x = 0;
                                                         accum_y = 0;
                                                         last_dir_y = 0;
-                                                    } else if delta.abs() > DEADZONE {
-                                                        // Normal movement - simple proportional scroll
-                                                        let scaled = delta / 8;
-                                                        if scaled != 0 {
+                                                    } else {
+                                                        // Accumulate all movement, no deadzone
+                                                        accum_x += delta;
+                                                        // Output when accumulated enough
+                                                        if accum_x.abs() >= ACCUM_THRESHOLD {
+                                                            let output = if accum_x.abs()
+                                                                < ACCUM_THRESHOLD * 2
+                                                            {
+                                                                // Small accumulated movement: output ±1
+                                                                if accum_x > 0 {
+                                                                    1
+                                                                } else {
+                                                                    -1
+                                                                }
+                                                            } else {
+                                                                // Larger movement: proportional
+                                                                (accum_x / 8).clamp(-20, 20)
+                                                            };
                                                             s_clone.x_delta.fetch_add(
-                                                                scaled,
+                                                                output,
                                                                 Ordering::SeqCst,
                                                             );
+                                                            accum_x = 0;
                                                         }
                                                     }
                                                 }
@@ -418,18 +431,30 @@ impl TouchpadMonitor {
                                                 if let Some(last_y) = last_abs_y {
                                                     let delta = ev.value() - last_y;
                                                     if delta.abs() >= JUMP_THRESHOLD {
-                                                        // Large jump = finger lift/place, reset tracking
                                                         accum_x = 0;
                                                         accum_y = 0;
                                                         last_dir_y = 0;
-                                                    } else if delta.abs() > DEADZONE {
-                                                        // Normal movement - simple proportional scroll
-                                                        let scaled = delta / 8;
-                                                        if scaled != 0 {
+                                                    } else {
+                                                        // Accumulate all movement, no deadzone
+                                                        accum_y += delta;
+                                                        // Output when accumulated enough
+                                                        if accum_y.abs() >= ACCUM_THRESHOLD {
+                                                            let output = if accum_y.abs()
+                                                                < ACCUM_THRESHOLD * 2
+                                                            {
+                                                                if accum_y > 0 {
+                                                                    1
+                                                                } else {
+                                                                    -1
+                                                                }
+                                                            } else {
+                                                                (accum_y / 8).clamp(-20, 20)
+                                                            };
                                                             s_clone.y_delta.fetch_add(
-                                                                scaled,
+                                                                output,
                                                                 Ordering::SeqCst,
                                                             );
+                                                            accum_y = 0;
                                                         }
                                                     }
                                                 }
