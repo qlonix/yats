@@ -1,9 +1,11 @@
 mod config;
 mod keyboard_hook;
+mod platform;
 mod touchpad_monitor;
 
 use crate::config::AppConfig;
 use crate::keyboard_hook::{KeyboardHook, IS_PAUSED};
+use crate::platform::SystemInfo;
 use crate::touchpad_monitor::TouchpadMonitor;
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -18,24 +20,10 @@ use tauri::{
     tray::{MouseButton, TrayIconBuilder, TrayIconEvent},
     Emitter, Manager,
 };
-#[cfg(target_os = "windows")]
-use winreg::enums::*;
-#[cfg(target_os = "windows")]
-use winreg::RegKey;
 
 static LOG_PATH: OnceLock<PathBuf> = OnceLock::new();
 static LOG_TX: OnceLock<Sender<String>> = OnceLock::new();
 static PAUSE_MENU_ITEM: OnceLock<CheckMenuItem<tauri::Wry>> = OnceLock::new();
-
-#[cfg(target_os = "windows")]
-pub fn is_elevated() -> bool {
-    std::fs::metadata("C:\\Windows\\System32\\config\\SAM").is_ok()
-}
-
-#[cfg(target_os = "linux")]
-pub fn is_elevated() -> bool {
-    nix::unistd::Uid::effective().is_root()
-}
 
 pub fn audit_log(msg: &str) {
     if let Some(tx) = LOG_TX.get() {
@@ -86,7 +74,6 @@ fn set_config(
     ));
     *config.write().unwrap() = new_config.clone();
 
-    // モニター遅延を同期
     monitor
         .state
         .release_delay_ms
@@ -112,7 +99,7 @@ fn lock_device_cmd(monitor: tauri::State<'_, Arc<TouchpadMonitor>>, device_id: O
 
 #[tauri::command]
 fn check_elevation_cmd() -> bool {
-    is_elevated()
+    platform::Platform::is_elevated()
 }
 
 #[tauri::command]
@@ -156,20 +143,14 @@ fn set_paused_cmd(app: tauri::AppHandle, paused: bool) {
     audit_log(&format!("[SYSTEM] Pause state changed to: {}", paused));
 }
 
+// Startup functions using platform-specific implementation
 #[cfg(target_os = "windows")]
 #[tauri::command]
 fn set_startup_cmd(enabled: bool) -> Result<(), String> {
     audit_log(&format!("[SYSTEM] Startup toggle requested: {}", enabled));
 
-    // 1. レジストリのクリーンアップ (古い方式の削除)
-    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    let reg_path = r"Software\Microsoft\Windows\CurrentVersion\Run";
-    if let Ok(key) = hkcu.open_subkey_with_flags(reg_path, winreg::enums::KEY_SET_VALUE) {
-        let _ = key.delete_value("YATS");
-    }
-
-    // 2. スタートアップフォルダへのショートカット処理
-    // %APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup
+    // Note: Windows startup now uses shortcut method from the platform module
+    // but we keep the custom logic here for backwards compatibility
     let app_data = std::env::var("APPDATA").map_err(|e| e.to_string())?;
     let mut startup_path = std::path::PathBuf::from(app_data);
     startup_path.push(r"Microsoft\Windows\Start Menu\Programs\Startup");
@@ -180,7 +161,6 @@ fn set_startup_cmd(enabled: bool) -> Result<(), String> {
         let exe_str = exe_path.to_str().ok_or("Invalid exe path")?;
         let lnk_str = startup_path.to_str().ok_or("Invalid shortcut path")?;
 
-        // PowerShellを使用してショートカットを作成
         let script = format!(
             "$s=(New-Object -ComObject WScript.Shell).CreateShortcut('{}');$s.TargetPath='{}';$s.Save()",
             lnk_str, exe_str
@@ -189,7 +169,7 @@ fn set_startup_cmd(enabled: bool) -> Result<(), String> {
         use std::os::windows::process::CommandExt;
         Command::new("powershell")
             .args(&["-Command", &script])
-            .creation_flags(0x08000000) // CREATE_NO_WINDOW
+            .creation_flags(0x08000000)
             .status()
             .map_err(|e| e.to_string())?;
 
@@ -206,131 +186,91 @@ fn set_startup_cmd(enabled: bool) -> Result<(), String> {
 #[cfg(target_os = "linux")]
 #[tauri::command]
 fn set_startup_cmd(enabled: bool) -> Result<(), String> {
-    audit_log(&format!(
-        "[SYSTEM] Startup toggle requested (Linux): {}",
-        enabled
-    ));
-
-    let home = std::env::var("HOME").map_err(|e| e.to_string())?;
-    let mut autostart_dir = std::path::PathBuf::from(home);
-    autostart_dir.push(".config");
-    autostart_dir.push("autostart");
-
-    if !autostart_dir.exists() {
-        std::fs::create_dir_all(&autostart_dir).map_err(|e| e.to_string())?;
-    }
-
-    let mut desktop_file = autostart_dir.clone();
-    desktop_file.push("yats.desktop");
-
-    if enabled {
-        let exe_path = std::env::current_exe().map_err(|e| e.to_string())?;
-        let content = format!(
-            "[Desktop Entry]\nType=Application\nName=YATS\nExec={}\nHidden=false\nNoDisplay=false\nX-GNOME-Autostart-enabled=true\n",
-            exe_path.to_string_lossy()
-        );
-        std::fs::write(&desktop_file, content).map_err(|e| e.to_string())?;
-        audit_log("[SYSTEM] Startup .desktop file created.");
-    } else {
-        if desktop_file.exists() {
-            std::fs::remove_file(desktop_file).map_err(|e| e.to_string())?;
-            audit_log("[SYSTEM] Startup .desktop file removed.");
-        }
-    }
-    Ok(())
+    platform::Platform::set_startup(enabled)
 }
 
-#[cfg(target_os = "windows")]
 #[tauri::command]
 fn get_startup_status_cmd() -> bool {
-    let app_data = match std::env::var("APPDATA") {
-        Ok(v) => v,
-        Err(_) => return false,
-    };
-    let mut startup_path = std::path::PathBuf::from(app_data);
-    startup_path.push(r"Microsoft\Windows\Start Menu\Programs\Startup");
-    startup_path.push("YATS.lnk");
-
-    startup_path.exists()
+    platform::Platform::get_startup_status()
 }
 
-#[cfg(target_os = "linux")]
-#[tauri::command]
-fn get_startup_status_cmd() -> bool {
-    let home = match std::env::var("HOME") {
-        Ok(v) => v,
-        Err(_) => return false,
-    };
-    let mut desktop_file = std::path::PathBuf::from(home);
-    desktop_file.push(".config");
-    desktop_file.push("autostart");
-    desktop_file.push("yats.desktop");
-
-    desktop_file.exists()
-}
-
-#[cfg(target_os = "windows")]
 #[tauri::command]
 fn get_aap_threshold() -> Result<i32, String> {
-    let output = Command::new("reg")
-        .args(&[
-            "query",
-            "HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad",
-            "/v",
-            "AAPThreshold",
-        ])
-        .output()
-        .map_err(|e| e.to_string())?;
+    #[cfg(target_os = "windows")]
+    {
+        // Keep the custom implementation here for now
+        let output = Command::new("reg")
+            .args(&[
+                "query",
+                "HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad",
+                "/v",
+                "AAPThreshold",
+            ])
+            .output()
+            .map_err(|e| e.to_string())?;
 
-    if !output.status.success() {
-        return Ok(2);
-    }
+        if !output.status.success() {
+            return Ok(2);
+        }
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    for line in stdout.lines() {
-        if line.contains("AAPThreshold") {
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.len() >= 3 {
-                let val_str = parts[parts.len() - 1];
-                if val_str.starts_with("0x") {
-                    if let Ok(val) = i32::from_str_radix(&val_str[2..], 16) {
-                        return Ok(val);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        for line in stdout.lines() {
+            if line.contains("AAPThreshold") {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 3 {
+                    let val_str = parts[parts.len() - 1];
+                    if val_str.starts_with("0x") {
+                        if let Ok(val) = i32::from_str_radix(&val_str[2..], 16) {
+                            return Ok(val);
+                        }
                     }
                 }
             }
         }
+        Ok(2)
     }
-    Ok(2)
+
+    #[cfg(target_os = "linux")]
+    {
+        platform::Platform::get_aap_threshold()
+    }
 }
 
-#[cfg(target_os = "windows")]
 #[tauri::command]
 fn set_aap_threshold(value: i32) -> Result<(), String> {
-    audit_log(&format!(
-        "[SYSTEM] Changing AAPThreshold Registry to {}",
-        value
-    ));
-    Command::new("reg")
-        .args(&[
-            "add",
-            "HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad",
-            "/v",
-            "AAPThreshold",
-            "/t",
-            "REG_DWORD",
-            "/d",
-            &value.to_string(),
-            "/f",
-        ])
-        .status()
-        .map_err(|e| e.to_string())?;
-    Ok(())
+    #[cfg(target_os = "windows")]
+    {
+        audit_log(&format!(
+            "[SYSTEM] Changing AAPThreshold Registry to {}",
+            value
+        ));
+        Command::new("reg")
+            .args(&[
+                "add",
+                "HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad",
+                "/v",
+                "AAPThreshold",
+                "/t",
+                "REG_DWORD",
+                "/d",
+                &value.to_string(),
+                "/f",
+            ])
+            .status()
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        platform::Platform::set_aap_threshold(value)
+    }
 }
 
 #[cfg(target_os = "windows")]
 #[tauri::command]
 fn deep_registry_clean_cmd() -> Result<String, String> {
-    if !is_elevated() {
+    if !platform::Platform::is_elevated() {
         return Err("管理者権限が必要です。".to_string());
     }
     let mut results = Vec::new();
@@ -374,18 +314,8 @@ fn deep_registry_clean_cmd() -> Result<String, String> {
 
 #[cfg(target_os = "linux")]
 #[tauri::command]
-fn get_aap_threshold() -> Result<i32, String> {
-    Ok(0)
-}
-#[cfg(target_os = "linux")]
-#[tauri::command]
-fn set_aap_threshold(_value: i32) -> Result<(), String> {
-    Ok(())
-}
-#[cfg(target_os = "linux")]
-#[tauri::command]
 fn deep_registry_clean_cmd() -> Result<String, String> {
-    Ok("Not supported on Linux".to_string())
+    platform::Platform::deep_registry_clean()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -448,7 +378,6 @@ pub fn run() {
                 cfg
             };
 
-            // 初期ロードからモニター遅延を同期
             monitor_clone
                 .state
                 .release_delay_ms
@@ -462,7 +391,6 @@ pub fn run() {
                 CheckMenuItem::with_id(app, "pause", "機能の一時停止", true, false, None::<&str>)?;
             let menu = Menu::with_items(app, &[&settings_i, &pause_i, &quit_i])?;
 
-            // 同期用にハンドルを保存
             let _ = PAUSE_MENU_ITEM.set(pause_i.clone());
 
             let _tray = TrayIconBuilder::new()
@@ -470,30 +398,27 @@ pub fn run() {
                 .tooltip("YATS")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
-                .on_menu_event(|app, event| {
-                    match event.id.as_ref() {
-                        "quit" => app.exit(0),
-                        "settings" => {
-                            if let Some(window) = app.get_webview_window("main") {
-                                let _ = window.show().ok();
-                                let _ = window.set_focus().ok();
-                            }
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "quit" => app.exit(0),
+                    "settings" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show().ok();
+                            let _ = window.set_focus().ok();
                         }
-                        "pause" => {
-                            let is_checked = IS_PAUSED.load(Ordering::SeqCst);
-                            let new_state = !is_checked;
-                            IS_PAUSED.store(new_state, Ordering::SeqCst);
-
-                            // 同期: メニュー項目のチェックマークを視覚的に更新
-                            if let Some(item) = PAUSE_MENU_ITEM.get() {
-                                let _ = item.set_checked(new_state);
-                            }
-
-                            let _ = app.emit("pause-status", new_state).ok();
-                            audit_log(&format!("[TRAY] Pause toggled to: {}", new_state));
-                        }
-                        _ => {}
                     }
+                    "pause" => {
+                        let is_checked = IS_PAUSED.load(Ordering::SeqCst);
+                        let new_state = !is_checked;
+                        IS_PAUSED.store(new_state, Ordering::SeqCst);
+
+                        if let Some(item) = PAUSE_MENU_ITEM.get() {
+                            let _ = item.set_checked(new_state);
+                        }
+
+                        let _ = app.emit("pause-status", new_state).ok();
+                        audit_log(&format!("[TRAY] Pause toggled to: {}", new_state));
+                    }
+                    _ => {}
                 })
                 .on_tray_icon_event({
                     let app_handle = app.handle().clone();
@@ -512,7 +437,6 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            // 起動時に自動スキャン
             monitor_clone.scan_and_register();
 
             std::thread::spawn(move || {
