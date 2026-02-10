@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=YATS
+Comment=Yet Another Touchpad Shortcut
+Exec=yats
+Icon=yats
+Type=Application
+Categories=Utility;
+Terminal=false
+StartupNotify=false
+X-GNOME-Autostart-enabled=true

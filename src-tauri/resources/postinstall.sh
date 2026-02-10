@@ -1,0 +1,22 @@
+#!/bin/bash
+# YATS Debian package post-installation script
+
+echo ""
+echo "============================================"
+echo "  YATS インストール完了"
+echo "============================================"
+echo ""
+echo "重要: タッチパッド機能を使用するには、ユーザーを 'input' グループに追加する必要があります。"
+echo ""
+echo "以下のコマンドを実行してください:"
+echo ""
+echo "  sudo usermod -a -G input \$USER"
+echo ""
+echo "その後、ログアウトして再ログインしてください。"
+echo ""
+echo "確認方法:"
+echo "  groups"
+echo ""
+echo "出力に 'input' が含まれていれば成功です。"
+echo "============================================"
+echo ""
