@@ -43,6 +43,11 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "windows": {
+      "wix": {
+        "language": "ja-JP"
+      }
+    },
     "linux": {
       "deb": {
         "depends": [
