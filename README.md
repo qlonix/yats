@@ -53,6 +53,20 @@ chmod +x yats_*.AppImage
 ./yats_*.AppImage
 ```
 
+> **注意**: AppImageには以下の制約があります：
+> - **推奨**: 可能であれば `.deb` パッケージの使用を推奨します
+> - **udevルール**: AppImageではudevルールが自動インストールされないため、手動でセットアップが必要です：
+>   ```bash
+>   # リポジトリからudevルールをダウンロード
+>   sudo curl -o /etc/udev/rules.d/99-yats-touchpad.rules \
+>     https://raw.githubusercontent.com/qlonix/yats/main/src-tauri/resources/99-yats-touchpad.rules
+>   
+>   # udevルールを再読み込み
+>   sudo udevadm control --reload-rules
+>   sudo udevadm trigger
+>   ```
+> - **FUSE要件**: AppImageの実行にはFUSEが必要です（最近のディストリビューションには通常含まれています）
+
 #### 確認方法
 
 `input` グループに追加されたか確認するには:
