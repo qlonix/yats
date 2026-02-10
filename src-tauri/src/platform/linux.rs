@@ -1,7 +1,7 @@
 // Linux-specific platform implementations
 
 use crate::config::{MouseButton, WindowAction};
-use enigo::{Button, Coordinate, Direction, Enigo, Mouse, Settings};
+use enigo::{Button, Direction, Enigo, Mouse, Settings};
 
 pub struct LinuxPlatform;
 

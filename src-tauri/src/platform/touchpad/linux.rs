@@ -4,6 +4,7 @@ use crate::touchpad_monitor::MonitorState;
 use evdev::{AbsoluteAxisType, Device, EventType};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use tauri::Emitter;
 
 pub fn run_monitor(state: Arc<MonitorState>) {
     crate::audit_log("[MONITOR] Starting Linux Monitor Worker");
