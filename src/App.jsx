@@ -247,7 +247,7 @@ function App() {
   const [recordingMacroKey, setRecordingMacroKey] = useState(null);
   const [showScrollSettings, setShowScrollSettings] = useState(false);
   const [scrollSensitivity, setScrollSensitivity] = useState(100);
-  const [scrollSpeed, setScrollSpeed] = useState(100);
+  const [scrollSpeed, setScrollSpeed] = useState(50);
   const [scrollInvert, setScrollInvert] = useState(false);
 
   useEffect(() => {
@@ -276,7 +276,7 @@ function App() {
       setMappings(normalized);
       setReleaseDelay(config.release_delay_ms || 200);
       setScrollSensitivity(config.scroll_sensitivity || 100);
-      setScrollSpeed(config.scroll_speed || 100);
+      setScrollSpeed(config.scroll_speed || 50);
       setScrollInvert(config.scroll_invert || false);
     });
 
@@ -456,7 +456,25 @@ function App() {
                   * This setting affects ALL scroll shortcuts. Control is finer at lower ranges.
                 </p>
               </div>
-              <label className="header-control-item" style={{ fontSize: "1rem", color: "#e0e0e0", cursor: "pointer" }}>
+              <div style={{ marginTop: "20px" }}>
+                <label style={{ display: "block", marginBottom: "8px", fontSize: "0.9rem", color: "#888" }}>
+                  Scroll Speed: <span className="value-display" style={{ fontSize: "1.1rem" }}>{Math.round(scrollSpeed * 2)}</span>%
+                </label>
+                <input
+                  type="range" min="5" max="50" step="1"
+                  style={{ width: "100%", height: "6px", accentColor: "#00d2ff" }}
+                  value={scrollSpeed}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value);
+                    setScrollSpeed(val);
+                    saveConfig(null, null, null, null, val);
+                  }}
+                />
+                <p style={{ fontSize: "0.75rem", color: "#555", marginTop: "8px" }}>
+                  * Controls how fast the page scrolls. Lower = slower, higher = faster.
+                </p>
+              </div>
+              <label className="header-control-item" style={{ fontSize: "1rem", color: "#e0e0e0", cursor: "pointer", marginTop: "16px" }}>
                 <input
                   type="checkbox"
                   style={{ width: "18px", height: "18px" }}
@@ -469,24 +487,6 @@ function App() {
                 />
                 Invert Scroll Direction
               </label>
-              <div style={{ marginTop: "20px" }}>
-                <label style={{ display: "block", marginBottom: "8px", fontSize: "0.9rem", color: "#888" }}>
-                  Scroll Speed: <span className="value-display" style={{ fontSize: "1.1rem" }}>{scrollSpeed}</span>%
-                </label>
-                <input
-                  type="range" min="10" max="500" step="10"
-                  style={{ width: "100%", height: "6px", accentColor: "#3a7bd5" }}
-                  value={scrollSpeed}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value);
-                    setScrollSpeed(val);
-                    saveConfig(null, null, null, null, val);
-                  }}
-                />
-                <p style={{ fontSize: "0.75rem", color: "#555", marginTop: "8px" }}>
-                  * Controls how fast the page scrolls. 100% = default, lower = slower, higher = faster.
-                </p>
-              </div>
             </div>
             <button className="btn-close-modal" onClick={() => setShowScrollSettings(false)}>Close</button>
           </div>

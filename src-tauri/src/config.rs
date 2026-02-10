@@ -57,7 +57,7 @@ fn default_sensitivity() -> u32 {
 }
 
 fn default_scroll_speed() -> u32 {
-    100
+    50
 }
 
 impl Default for AppConfig {
@@ -101,7 +101,7 @@ impl Default for AppConfig {
             mappings,
             release_delay_ms: 200,
             scroll_sensitivity: 100,
-            scroll_speed: 100,
+            scroll_speed: 50,
             scroll_invert: false,
         }
     }
