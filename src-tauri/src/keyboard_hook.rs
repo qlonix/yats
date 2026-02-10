@@ -408,81 +408,88 @@ impl KeyboardHook {
         let tx = self.tx.clone();
         let config_ref = Arc::clone(&self.config);
         let monitor_ref = Arc::clone(&self.monitor);
-        // リピート無視のため押下キーを追跡
-        let pressed_keys = Arc::new(Mutex::new(std::collections::HashSet::new()));
 
-        if let Err(e) = rdev::grab(move |event| {
-            if IS_PAUSED.load(Ordering::SeqCst) || IS_SIMULATING.load(Ordering::SeqCst) {
-                return Some(event);
-            }
+        // Retry loop: rdev::grab may exit after sleep/resume when devices are reinitialized
+        loop {
+            let tx_inner = tx.clone();
+            let config_inner = Arc::clone(&config_ref);
+            let monitor_inner = Arc::clone(&monitor_ref);
+            // リピート無視のため押下キーを追跡
+            let pressed_keys = Arc::new(Mutex::new(std::collections::HashSet::new()));
 
-            match event.event_type {
-                rdev::EventType::KeyPress(key) => {
-                    let mut keys = pressed_keys.lock().unwrap();
-                    if keys.contains(&key) {
-                        return None;
-                    }
-
-                    // 安全ガード: タッチパッドに触れていない場合はキーをスルー（何もしない）
-                    // タッチがない場合、ユーザーは「機能をトリガーしない」ことを望んでいる
-                    // 通常、これは「通常のキーとして動作する」ことを意味する
-                    if !monitor_ref.is_touched() {
-                        return Some(event);
-                    }
-
-                    keys.insert(key);
-
-                    let action = {
-                        let cfg = config_ref.read().unwrap();
-                        cfg.mappings.get(&key).cloned()
-                    };
-
-                    if let Some(action) = action {
-                        match action {
-                            Action::MouseScroll(cfg) => {
-                                monitor_ref.consume_y_delta();
-                                let _ = tx.send(RemapCommand::UpdateScroll(Some(cfg)));
-                            }
-                            _ => {
-                                let _ = tx.send(RemapCommand::Execute(action, true));
-                            }
-                        }
-                        return None;
-                    }
+            crate::audit_log("[HOOK] Calling rdev::grab...");
+            if let Err(e) = rdev::grab(move |event| {
+                if IS_PAUSED.load(Ordering::SeqCst) || IS_SIMULATING.load(Ordering::SeqCst) {
+                    return Some(event);
                 }
-                rdev::EventType::KeyRelease(key) => {
-                    let mut keys = pressed_keys.lock().unwrap();
-                    // セットにキーがない場合、Pressをキャプチャしていないことを意味する
-                    // （安全ガードのため、またはマッピングされていなかったため）
-                    // その場合、ReleaseをOSにスルーしなければならない
-                    if !keys.remove(&key) {
-                        return Some(event);
-                    }
 
-                    let action = {
-                        let cfg = config_ref.read().unwrap();
-                        cfg.mappings.get(&key).cloned()
-                    };
-
-                    if let Some(action) = action {
-                        match action {
-                            Action::MouseScroll(_) => {
-                                let _ = tx.send(RemapCommand::UpdateScroll(None));
-                            }
-                            _ => {
-                                let _ = tx.send(RemapCommand::Execute(action, false));
-                            }
+                match event.event_type {
+                    rdev::EventType::KeyPress(key) => {
+                        let mut keys = pressed_keys.lock().unwrap();
+                        if keys.contains(&key) {
+                            return None;
                         }
-                        return None;
+
+                        // 安全ガード: タッチパッドに触れていない場合はキーをスルー（何もしない）
+                        if !monitor_inner.is_touched() {
+                            return Some(event);
+                        }
+
+                        keys.insert(key);
+
+                        let action = {
+                            let cfg = config_inner.read().unwrap();
+                            cfg.mappings.get(&key).cloned()
+                        };
+
+                        if let Some(action) = action {
+                            match action {
+                                Action::MouseScroll(cfg) => {
+                                    monitor_inner.consume_y_delta();
+                                    let _ = tx_inner.send(RemapCommand::UpdateScroll(Some(cfg)));
+                                }
+                                _ => {
+                                    let _ = tx_inner.send(RemapCommand::Execute(action, true));
+                                }
+                            }
+                            return None;
+                        }
                     }
+                    rdev::EventType::KeyRelease(key) => {
+                        let mut keys = pressed_keys.lock().unwrap();
+                        if !keys.remove(&key) {
+                            return Some(event);
+                        }
+
+                        let action = {
+                            let cfg = config_inner.read().unwrap();
+                            cfg.mappings.get(&key).cloned()
+                        };
+
+                        if let Some(action) = action {
+                            match action {
+                                Action::MouseScroll(_) => {
+                                    let _ = tx_inner.send(RemapCommand::UpdateScroll(None));
+                                }
+                                _ => {
+                                    let _ = tx_inner.send(RemapCommand::Execute(action, false));
+                                }
+                            }
+                            return None;
+                        }
+                    }
+                    _ => {}
                 }
-                _ => {}
+                Some(event)
+            }) {
+                crate::audit_log(&format!(
+                    "[HOOK] rdev::grab error: {:?}. Retrying in 3s...",
+                    e
+                ));
+                eprintln!("[HOOK] Error: {:?}. Retrying...", e);
             }
-            Some(event)
-        }) {
-            crate::audit_log(&format!("[HOOK] rdev::grab error: {:?}", e));
-            eprintln!("[HOOK] Error: {:?}", e);
+            crate::audit_log("[HOOK] Keyboard hook exited, restarting in 3s...");
+            std::thread::sleep(std::time::Duration::from_secs(3));
         }
-        crate::audit_log("[HOOK] Keyboard hook exited");
     }
 }
