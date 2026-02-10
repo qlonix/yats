@@ -40,6 +40,15 @@ sudo usermod -a -G input $USER
 
 変更を反映するには、**ログアウトして再ログイン**（または再起動）してください。
 
+**確認方法**:
+
+`input` グループに追加されたか確認するには:
+```bash
+groups
+```
+
+出力に `input` が含まれていれば成功です。
+
 #### インストール方法
 
 **Debian/Ubuntu系 (.deb)**:
@@ -66,15 +75,6 @@ chmod +x yats_*.AppImage
 >   sudo udevadm trigger
 >   ```
 > - **FUSE要件**: AppImageの実行にはFUSEが必要です（最近のディストリビューションには通常含まれています）
-
-#### 確認方法
-
-`input` グループに追加されたか確認するには:
-```bash
-groups
-```
-
-出力に `input` が含まれていれば成功です。
 
 ## 開発
 
