@@ -78,8 +78,9 @@ fn set_config(
     new_config: AppConfig,
 ) -> Result<(), String> {
     audit_log(&format!(
-        "[SYSTEM] Saving config: Sens={}, Invert={}, Mappings={}",
+        "[SYSTEM] Saving config: Sens={}, Speed={}, Invert={}, Mappings={}",
         new_config.scroll_sensitivity,
+        new_config.scroll_speed,
         new_config.scroll_invert,
         new_config.mappings.len()
     ));

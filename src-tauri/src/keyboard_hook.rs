@@ -335,9 +335,13 @@ impl HookWorker {
                     // 以前はキー毎に感度を持っていましたが、全キー共通のグローバル設定に変更しました。
                     // また、感度のレンジをさらに調整：旧 50% (Sens 50) が新 100% になるようにシフト（2倍細かく）。
 
-                    let (global_sens, global_invert) = {
+                    let (global_sens, global_invert, global_speed) = {
                         let cfg_lock = self.config.read().unwrap();
-                        (cfg_lock.scroll_sensitivity, cfg_lock.scroll_invert)
+                        (
+                            cfg_lock.scroll_sensitivity,
+                            cfg_lock.scroll_invert,
+                            cfg_lock.scroll_speed,
+                        )
                     };
 
                     let mut delta = raw_delta;
@@ -350,9 +354,10 @@ impl HookWorker {
                     // v2.7.0: Reverted to linear gain.
                     // UI handles the logarithmic mapping for the slider position.
                     let gain = (global_sens as f32) / 100.0;
+                    let speed = (global_speed as f32) / 100.0;
 
                     const LINEAR_SCALE: f32 = 40.0;
-                    self.accumulator_y += (delta as f32) * gain * LINEAR_SCALE;
+                    self.accumulator_y += (delta as f32) * gain * speed * LINEAR_SCALE;
                 }
 
                 // 3. Batching Dispatcher (Smooth 125Hz)

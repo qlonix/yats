@@ -46,11 +46,17 @@ pub struct AppConfig {
     pub release_delay_ms: u64,
     #[serde(default = "default_sensitivity")]
     pub scroll_sensitivity: u32,
+    #[serde(default = "default_scroll_speed")]
+    pub scroll_speed: u32,
     #[serde(default)]
     pub scroll_invert: bool,
 }
 
 fn default_sensitivity() -> u32 {
+    100
+}
+
+fn default_scroll_speed() -> u32 {
     100
 }
 
@@ -95,6 +101,7 @@ impl Default for AppConfig {
             mappings,
             release_delay_ms: 200,
             scroll_sensitivity: 100,
+            scroll_speed: 100,
             scroll_invert: false,
         }
     }
