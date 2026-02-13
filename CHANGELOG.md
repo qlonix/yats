@@ -5,6 +5,21 @@ All notable changes to YATS (Yet Another Touchpad Shortcut) will be documented i
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.3] - 2026-02-14
+
+### Fixed
+- **Linuxスクロール不具合の修正**: 速度制限（クランプ）がかかった際に微小な移動量が切り捨てられる問題を、OS側送信関数への累積器（アキュムレータ）導入により解決。
+
+### Changed
+- **UIの改善 (別画面化)**: `Global Scroll Settings` モーダルからLinux専用詳細設定を分離。新設した `Linux Scroll Tuning` モーダルへ移動し、UIのオーバーフローを解消。
+- **デフォルト値の調整**: `Max Scroll Output Speed` の初期値を 300 から 800 へ引き上げ。
+
+## [1.2.2] - 2026-02-13
+
+### Added
+- **Linux専用スクロール詳細設定**: 移動量、速度、最小/最大出力速度のチューニング項目を `AppConfig` および UI に追加。
+- **スクロールロジックの改善 (Linux)**: しきい値を超えるまで入力を抑制する「遊び」と、出力範囲のクランプ機能を実装。
+
 ## [1.2.1] - 2026-02-10
 
 ### Changed
