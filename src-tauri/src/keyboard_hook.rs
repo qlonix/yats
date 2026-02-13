@@ -167,11 +167,11 @@ impl HookWorker {
                     #[cfg(target_os = "linux")]
                     {
                         self.total_movement_y += delta;
-                        let current_speed = (delta / dt).abs();
+                        let current_speed = (delta / _dt).abs();
 
                         if !self.is_scrolling {
-                            if self.total_movement_y.abs() >= min_dist as f32
-                                || current_speed >= min_speed
+                            if self.total_movement_y.abs() >= _min_dist as f32
+                                || current_speed >= _min_speed
                             {
                                 self.is_scrolling = true;
                             }
@@ -196,10 +196,10 @@ impl HookWorker {
                             // output = addition
                             // speed_per_sec = addition / 0.008
                             let current_out_speed = addition.abs() / 0.008;
-                            if current_out_speed < min_scroll && current_out_speed > 0.0 {
-                                addition = addition.signum() * min_scroll * 0.008;
-                            } else if current_out_speed > max_scroll {
-                                addition = addition.signum() * max_scroll * 0.008;
+                            if current_out_speed < _min_scroll && current_out_speed > 0.0 {
+                                addition = addition.signum() * _min_scroll * 0.008;
+                            } else if current_out_speed > _max_scroll {
+                                addition = addition.signum() * _max_scroll * 0.008;
                             }
                         }
 
