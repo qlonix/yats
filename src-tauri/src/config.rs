@@ -58,6 +58,10 @@ pub struct AppConfig {
     pub linux_min_scroll_speed: f32,
     #[serde(default = "default_linux_max_scroll_speed")]
     pub linux_max_scroll_speed: f32,
+    #[serde(default)]
+    pub linux_use_scroll_curve: bool,
+    #[serde(default = "default_linux_scroll_curve")]
+    pub linux_scroll_curve: Vec<(f32, f32)>,
 }
 
 fn default_sensitivity() -> u32 {
@@ -82,6 +86,15 @@ fn default_linux_min_scroll_speed() -> f32 {
 
 fn default_linux_max_scroll_speed() -> f32 {
     800.0
+}
+
+fn default_linux_scroll_curve() -> Vec<(f32, f32)> {
+    vec![
+        (0.0, 0.0),
+        (500.0, 500.0),
+        (1000.0, 1000.0),
+        (2000.0, 2000.0),
+    ]
 }
 
 impl Default for AppConfig {
@@ -129,8 +142,10 @@ impl Default for AppConfig {
             scroll_invert: false,
             linux_min_distance: 0,
             linux_min_speed: 0.0,
-            linux_min_scroll_speed: 10.0,
-            linux_max_scroll_speed: 300.0,
+            linux_min_scroll_speed: 0.0,
+            linux_max_scroll_speed: 800.0,
+            linux_use_scroll_curve: false,
+            linux_scroll_curve: default_linux_scroll_curve(),
         }
     }
 }

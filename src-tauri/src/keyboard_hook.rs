@@ -146,6 +146,8 @@ impl HookWorker {
                         _min_speed,
                         _min_scroll,
                         _max_scroll,
+                        _use_curve,
+                        _curve,
                     ) = {
                         let cfg_lock = self.config.read().unwrap();
                         (
@@ -156,6 +158,8 @@ impl HookWorker {
                             cfg_lock.linux_min_speed,
                             cfg_lock.linux_min_scroll_speed,
                             cfg_lock.linux_max_scroll_speed,
+                            cfg_lock.linux_use_scroll_curve,
+                            cfg_lock.linux_scroll_curve.clone(),
                         )
                     };
 
@@ -192,14 +196,27 @@ impl HookWorker {
 
                         #[cfg(target_os = "linux")]
                         {
-                            // Speed clamping (addition per 8ms -> output per sec)
-                            // output = addition
-                            // speed_per_sec = addition / 0.008
-                            let current_out_speed = addition.abs() / 0.008;
-                            if current_out_speed < _min_scroll && current_out_speed > 0.0 {
-                                addition = addition.signum() * _min_scroll * 0.008;
-                            } else if current_out_speed > _max_scroll {
-                                addition = addition.signum() * _max_scroll * 0.008;
+                            if _use_curve && !_curve.is_empty() {
+                                // Curve based scaling
+                                let input_speed = (delta / _dt).abs();
+                                let output_speed = interpolate_curve(&_curve, input_speed);
+
+                                // output_total = delta * (output_speed / input_speed)
+                                // But to avoid div by zero and maintain direction:
+                                if input_speed > 0.1 {
+                                    let factor = output_speed / input_speed;
+                                    addition = delta * factor * 0.04; // 0.04 approx scale for Linux
+                                } else {
+                                    addition = 0.0;
+                                }
+                            } else {
+                                // Linear based scaling (existing logic)
+                                let current_out_speed = addition.abs() / 0.008;
+                                if current_out_speed < _min_scroll && current_out_speed > 0.0 {
+                                    addition = addition.signum() * _min_scroll * 0.008;
+                                } else if current_out_speed > _max_scroll {
+                                    addition = addition.signum() * _max_scroll * 0.008;
+                                }
                             }
                         }
 
@@ -333,4 +350,26 @@ impl KeyboardHook {
             std::thread::sleep(std::time::Duration::from_secs(3));
         }
     }
+}
+
+fn interpolate_curve(curve: &[(f32, f32)], input: f32) -> f32 {
+    if curve.is_empty() {
+        return input;
+    }
+    if input <= curve[0].0 {
+        return curve[0].1;
+    }
+    if input >= curve[curve.len() - 1].0 {
+        return curve[curve.len() - 1].1;
+    }
+
+    for i in 0..curve.len() - 1 {
+        let (x0, y0) = curve[i];
+        let (x1, y1) = curve[i + 1];
+        if input >= x0 && input <= x1 {
+            let t = (input - x0) / (x1 - x0);
+            return y0 + t * (y1 - y0);
+        }
+    }
+    input
 }

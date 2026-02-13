@@ -761,3 +761,40 @@ select option:checked {
   border-radius: 4px;
   font-size: 0.9rem;
 }
+
+.mode-selector .btn-toggle {
+  background: #222;
+  border: 1px solid #444;
+  color: #888;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.mode-selector .btn-toggle.active {
+  background: #00d2ff22;
+  border-color: #00d2ff;
+  color: #00d2ff;
+}
+
+.curve-editor-container {
+  padding: 10px;
+  background: #1a1a1a;
+  border-radius: 8px;
+  border: 1px solid #333;
+}
+
+.curve-editor-wrapper {
+  margin-top: 10px;
+  display: flex;
+  justify-content: center;
+}
+
+.hint-text {
+  font-size: 0.75rem;
+  color: #666;
+  margin-top: 10px;
+  text-align: center;
+}

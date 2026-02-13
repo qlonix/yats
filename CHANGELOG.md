@@ -5,6 +5,14 @@ All notable changes to YATS (Yet Another Touchpad Shortcut) will be documented i
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.4] - 2026-02-14
+
+### Added
+- **スクロール感度曲線（カーブエディタ）**: マウスの移動速度に対するスクロール速度をグラフ上で直感的に設定できる機能を追加（Linux版）。
+  - ポイントのドラッグ、クリックによる追加、右クリックによる削除に対応。
+  - 従来の線形設定（Standard）と感度曲線（Advanced）をいつでも切り替え可能。
+- **データ構造の拡張**: `AppConfig` にカーブデータ保持用のフィールドを追加。
+
 ## [1.2.3] - 2026-02-14
 
 ### Fixed
