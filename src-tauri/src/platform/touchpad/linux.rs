@@ -141,6 +141,7 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                                 if let Some(last_x) = last_abs_x {
                                     let delta = ev.value() - last_x;
                                     if delta.abs() >= JUMP_THRESHOLD {
+                                        // 指が離れて別の場所に置かれたか、大きなノイズ
                                         accum_x = 0;
                                         accum_y = 0;
                                         last_dir_y = 0;
@@ -154,7 +155,8 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                                                     -1
                                                 }
                                             } else {
-                                                (accum_x / 8).clamp(-20, 20)
+                                                // Windows版と同じスケールに合わせる
+                                                accum_x.clamp(-120, 120)
                                             };
                                             state.x_delta.fetch_add(output, Ordering::SeqCst);
                                             accum_x = 0;
@@ -181,7 +183,7 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                                                     -1
                                                 }
                                             } else {
-                                                (accum_y / 8).clamp(-20, 20)
+                                                accum_y.clamp(-120, 120)
                                             };
                                             state.y_delta.fetch_add(output, Ordering::SeqCst);
                                             accum_y = 0;

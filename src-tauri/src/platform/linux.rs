@@ -42,7 +42,9 @@ impl super::InputSimulation for LinuxPlatform {
 
     fn send_mouse_scroll(delta: i32) {
         use rdev::{simulate, EventType};
-        let scaled_delta = delta / 8;
+        // Normalize delta to be comparable to Windows units (1 notch = 120)
+        // On Linux, rdev::simulate(Wheel) treats delta_y as discrete clicks.
+        let scaled_delta = delta / 40; // 40.0 is the LINEAR_SCALE in keyboard_hook.rs
         if scaled_delta != 0 {
             let _ = simulate(&EventType::Wheel {
                 delta_x: 0,
