@@ -19,4 +19,5 @@
 - **開発ルールは `.agent/rules.md` に明記し、適宜更新する。**
 - **コード類に変更があった場合は、都度 GitHub へプッシュ（git push）を行う。**
 - **GitHubのReleasesは指示があるまで追加/変更しない。**
+- **GitHubのReleasesのAssetsへの追加は指示があるまで行わない。**
 - **変更履歴を `CHANGELOG.md` に記載していく。**
