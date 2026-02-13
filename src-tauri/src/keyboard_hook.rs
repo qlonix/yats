@@ -82,6 +82,8 @@ pub struct HookWorker {
     config: Arc<RwLock<AppConfig>>,
     scroll_anchor: Option<(i32, i32)>,
     accumulator_y: f32,
+    total_movement_y: f32,
+    is_scrolling: bool,
     last_scroll_time: std::time::Instant,
 }
 
@@ -98,6 +100,8 @@ impl HookWorker {
             config,
             scroll_anchor: None,
             accumulator_y: 0.0,
+            total_movement_y: 0.0,
+            is_scrolling: false,
             last_scroll_time: std::time::Instant::now(),
         }
     }
@@ -116,6 +120,9 @@ impl HookWorker {
                         } else {
                             self.scroll_anchor = None;
                         }
+                        self.total_movement_y = 0.0;
+                        self.is_scrolling = false;
+                        self.accumulator_y = 0.0;
                     }
                 }
             }
@@ -126,30 +133,80 @@ impl HookWorker {
                 }
 
                 let raw_delta = self.monitor.consume_y_delta();
+                // Batching dispatcher
+                let now = std::time::Instant::now();
+                let _dt = now.duration_since(self.last_scroll_time).as_secs_f32();
+
                 if raw_delta != 0 {
-                    let (global_sens, global_invert, global_speed) = {
+                    let (
+                        global_sens,
+                        global_invert,
+                        global_speed,
+                        _min_dist,
+                        _min_speed,
+                        _min_scroll,
+                        _max_scroll,
+                    ) = {
                         let cfg_lock = self.config.read().unwrap();
                         (
                             cfg_lock.scroll_sensitivity,
                             cfg_lock.scroll_invert,
                             cfg_lock.scroll_speed,
+                            cfg_lock.linux_min_distance,
+                            cfg_lock.linux_min_speed,
+                            cfg_lock.linux_min_scroll_speed,
+                            cfg_lock.linux_max_scroll_speed,
                         )
                     };
 
-                    let mut delta = raw_delta;
+                    let mut delta = raw_delta as f32;
                     if global_invert {
                         delta = -delta;
                     }
 
-                    let gain = (global_sens as f32) / 100.0;
-                    let speed = (global_speed as f32) / 100.0;
+                    #[cfg(target_os = "linux")]
+                    {
+                        self.total_movement_y += delta;
+                        let current_speed = (delta / dt).abs();
 
-                    const LINEAR_SCALE: f32 = 40.0;
-                    self.accumulator_y += (delta as f32) * gain * speed * LINEAR_SCALE;
+                        if !self.is_scrolling {
+                            if self.total_movement_y.abs() >= min_dist as f32
+                                || current_speed >= min_speed
+                            {
+                                self.is_scrolling = true;
+                            }
+                        }
+                    }
+
+                    #[cfg(not(target_os = "linux"))]
+                    {
+                        self.is_scrolling = true;
+                    }
+
+                    if self.is_scrolling {
+                        let gain = (global_sens as f32) / 100.0;
+                        let speed = (global_speed as f32) / 100.0;
+
+                        const LINEAR_SCALE: f32 = 40.0;
+                        let mut addition = delta * gain * speed * LINEAR_SCALE;
+
+                        #[cfg(target_os = "linux")]
+                        {
+                            // Speed clamping (addition per 8ms -> output per sec)
+                            // output = addition
+                            // speed_per_sec = addition / 0.008
+                            let current_out_speed = addition.abs() / 0.008;
+                            if current_out_speed < min_scroll && current_out_speed > 0.0 {
+                                addition = addition.signum() * min_scroll * 0.008;
+                            } else if current_out_speed > max_scroll {
+                                addition = addition.signum() * max_scroll * 0.008;
+                            }
+                        }
+
+                        self.accumulator_y += addition;
+                    }
                 }
 
-                // Batching dispatcher
-                let now = std::time::Instant::now();
                 if now.duration_since(self.last_scroll_time).as_millis() >= 8 {
                     let output = self.accumulator_y.trunc() as i32;
                     if output != 0 {

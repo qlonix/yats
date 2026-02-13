@@ -50,6 +50,14 @@ pub struct AppConfig {
     pub scroll_speed: u32,
     #[serde(default)]
     pub scroll_invert: bool,
+    #[serde(default = "default_linux_min_distance")]
+    pub linux_min_distance: i32,
+    #[serde(default = "default_linux_min_speed")]
+    pub linux_min_speed: f32,
+    #[serde(default = "default_linux_min_scroll_speed")]
+    pub linux_min_scroll_speed: f32,
+    #[serde(default = "default_linux_max_scroll_speed")]
+    pub linux_max_scroll_speed: f32,
 }
 
 fn default_sensitivity() -> u32 {
@@ -58,6 +66,22 @@ fn default_sensitivity() -> u32 {
 
 fn default_scroll_speed() -> u32 {
     50
+}
+
+fn default_linux_min_distance() -> i32 {
+    0
+}
+
+fn default_linux_min_speed() -> f32 {
+    0.0
+}
+
+fn default_linux_min_scroll_speed() -> f32 {
+    10.0
+}
+
+fn default_linux_max_scroll_speed() -> f32 {
+    300.0
 }
 
 impl Default for AppConfig {
@@ -103,6 +127,10 @@ impl Default for AppConfig {
             scroll_sensitivity: 100,
             scroll_speed: 50,
             scroll_invert: false,
+            linux_min_distance: 0,
+            linux_min_speed: 0.0,
+            linux_min_scroll_speed: 10.0,
+            linux_max_scroll_speed: 300.0,
         }
     }
 }

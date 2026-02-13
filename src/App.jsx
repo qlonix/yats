@@ -249,6 +249,11 @@ function App() {
   const [scrollSensitivity, setScrollSensitivity] = useState(100);
   const [scrollSpeed, setScrollSpeed] = useState(50);
   const [scrollInvert, setScrollInvert] = useState(false);
+  const [linuxMinDistance, setLinuxMinDistance] = useState(0);
+  const [linuxMinSpeed, setLinuxMinSpeed] = useState(0.0);
+  const [linuxMinScrollSpeed, setLinuxMinScrollSpeed] = useState(10.0);
+  const [linuxMaxScrollSpeed, setLinuxMaxScrollSpeed] = useState(300.0);
+
 
   useEffect(() => {
     invoke("get_config").then((config) => {
@@ -278,6 +283,10 @@ function App() {
       setScrollSensitivity(config.scroll_sensitivity || 100);
       setScrollSpeed(config.scroll_speed || 50);
       setScrollInvert(config.scroll_invert || false);
+      setLinuxMinDistance(config.linux_min_distance || 0);
+      setLinuxMinSpeed(config.linux_min_speed || 0.0);
+      setLinuxMinScrollSpeed(config.linux_min_scroll_speed || 10.0);
+      setLinuxMaxScrollSpeed(config.linux_max_scroll_speed || 300.0);
     });
 
     invoke("get_paused").then(setIsPaused);
@@ -310,7 +319,7 @@ function App() {
     invoke("set_startup_cmd", { enabled: newVal });
   };
 
-  const saveConfig = (newMappings, newDelay, newSens, newInvert, newSpeed) => {
+  const saveConfig = (newMappings, newDelay, newSens, newInvert, newSpeed, linuxSettings = {}) => {
     invoke("set_config", {
       newConfig: {
         mappings: newMappings || mappings,
@@ -318,6 +327,10 @@ function App() {
         scroll_sensitivity: (newSens !== null && newSens !== undefined) ? newSens : scrollSensitivity,
         scroll_speed: (newSpeed !== null && newSpeed !== undefined) ? newSpeed : scrollSpeed,
         scroll_invert: (newInvert !== null && newInvert !== undefined) ? newInvert : scrollInvert,
+        linux_min_distance: linuxSettings.min_distance !== undefined ? linuxSettings.min_distance : linuxMinDistance,
+        linux_min_speed: linuxSettings.min_speed !== undefined ? linuxSettings.min_speed : linuxMinSpeed,
+        linux_min_scroll_speed: linuxSettings.min_scroll_speed !== undefined ? linuxSettings.min_scroll_speed : linuxMinScrollSpeed,
+        linux_max_scroll_speed: linuxSettings.max_scroll_speed !== undefined ? linuxSettings.max_scroll_speed : linuxMaxScrollSpeed,
       }
     }).catch(console.error);
   };
@@ -401,7 +414,7 @@ function App() {
             <h2>About YATS</h2>
             <p><strong>YATS</strong> stands for:</p>
             <p className="yats-full-name">Yet Another Touchpad Shortcut</p>
-            <p className="version-info">Version 1.2.0.1</p>
+            <p className="version-info">Version 1.2.2</p>
             <button className="btn-close-modal" onClick={() => setShowAbout(false)}>Close</button>
           </div>
         </div>
@@ -487,6 +500,90 @@ function App() {
                 />
                 Invert Scroll Direction
               </label>
+
+              <div className="linux-detail-settings" style={{ marginTop: "24px", paddingTop: "16px", borderTop: "1px solid #333" }}>
+                <h3 style={{ fontSize: "1rem", color: "#00d2ff", marginBottom: "16px" }}>Linux Detailed Tuning</h3>
+                
+                <div style={{ marginBottom: "16px" }}>
+                  <label className="setting-label">Min Mouse Distance (pixel)</label>
+                  <div className="setting-row">
+                    <input
+                      type="range" min="0" max="100" step="1"
+                      value={linuxMinDistance}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        setLinuxMinDistance(val);
+                        saveConfig(null, null, null, null, null, { min_distance: val });
+                      }}
+                    />
+                    <input type="number" value={linuxMinDistance} onChange={(e) => {
+                      const val = parseInt(e.target.value) || 0;
+                      setLinuxMinDistance(val);
+                      saveConfig(null, null, null, null, null, { min_distance: val });
+                    }} />
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: "16px" }}>
+                  <label className="setting-label">Min Mouse Speed (pixel/sec)</label>
+                  <div className="setting-row">
+                    <input
+                      type="range" min="0" max="500" step="5"
+                      value={linuxMinSpeed}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setLinuxMinSpeed(val);
+                        saveConfig(null, null, null, null, null, { min_speed: val });
+                      }}
+                    />
+                    <input type="number" value={linuxMinSpeed} onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 0;
+                      setLinuxMinSpeed(val);
+                      saveConfig(null, null, null, null, null, { min_speed: val });
+                    }} />
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: "16px" }}>
+                  <label className="setting-label">Min Scroll Output Speed</label>
+                  <div className="setting-row">
+                    <input
+                      type="range" min="0" max="100" step="1"
+                      value={linuxMinScrollSpeed}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setLinuxMinScrollSpeed(val);
+                        saveConfig(null, null, null, null, null, { min_scroll_speed: val });
+                      }}
+                    />
+                    <input type="number" value={linuxMinScrollSpeed} onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 0;
+                      setLinuxMinScrollSpeed(val);
+                      saveConfig(null, null, null, null, null, { min_scroll_speed: val });
+                    }} />
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: "16px" }}>
+                  <label className="setting-label">Max Scroll Output Speed</label>
+                  <div className="setting-row">
+                    <input
+                      type="range" min="0" max="1000" step="10"
+                      value={linuxMaxScrollSpeed}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setLinuxMaxScrollSpeed(val);
+                        saveConfig(null, null, null, null, null, { max_scroll_speed: val });
+                      }}
+                    />
+                    <input type="number" value={linuxMaxScrollSpeed} onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 0;
+                      setLinuxMaxScrollSpeed(val);
+                      saveConfig(null, null, null, null, null, { max_scroll_speed: val });
+                    }} />
+                  </div>
+                </div>
+              </div>
             </div>
             <button className="btn-close-modal" onClick={() => setShowScrollSettings(false)}>Close</button>
           </div>
