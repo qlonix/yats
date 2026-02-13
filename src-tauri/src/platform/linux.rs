@@ -42,10 +42,15 @@ impl super::InputSimulation for LinuxPlatform {
 
     fn send_mouse_scroll(delta: i32) {
         use rdev::{simulate, EventType};
-        // Normalize delta to be comparable to Windows units (1 notch = 120)
-        // On Linux, rdev::simulate(Wheel) treats delta_y as discrete clicks.
-        let scaled_delta = delta / 40; // 40.0 is the LINEAR_SCALE in keyboard_hook.rs
+        use std::sync::atomic::{AtomicI32, Ordering};
+        static ACCUMULATOR: AtomicI32 = AtomicI32::new(0);
+
+        // 蓄積して 40 (LINEAR_SCALE) に達したら送信する
+        let total = ACCUMULATOR.fetch_add(delta, Ordering::SeqCst) + delta;
+        let scaled_delta = total / 40;
+
         if scaled_delta != 0 {
+            ACCUMULATOR.fetch_sub(scaled_delta * 40, Ordering::SeqCst);
             let _ = simulate(&EventType::Wheel {
                 delta_x: 0,
                 delta_y: scaled_delta as i64,

@@ -81,7 +81,7 @@ fn default_linux_min_scroll_speed() -> f32 {
 }
 
 fn default_linux_max_scroll_speed() -> f32 {
-    300.0
+    800.0
 }
 
 impl Default for AppConfig {
