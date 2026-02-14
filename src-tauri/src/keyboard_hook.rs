@@ -412,13 +412,7 @@ impl KeyboardHook {
                     keys.insert(evdev::Key(i as u16));
                 }
 
-                uinput_builder = match uinput_builder.with_keys(&keys) {
-                    Ok(b) => b,
-                    Err(e) => {
-                        crate::audit_log(&format!("[HOOK] uinput with_keys error: {}", e));
-                        panic!("uinput keys fail");
-                    }
-                };
+                uinput_builder = uinput_builder.with_keys(&keys);
 
                 let mut virtual_device = uinput_builder.build().unwrap_or_else(|e| {
                     crate::audit_log(&format!("[HOOK] Failed to build uinput device: {}", e));
