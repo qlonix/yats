@@ -354,7 +354,7 @@ impl KeyboardHook {
 
         #[cfg(target_os = "linux")]
         {
-            crate::audit_log("[HOOK] Starting Linux Keyboard Hook (evdev)...");
+            crate::audit_log("[HOOK] Starting Linux Keyboard Hook (evdev + uinput)...");
             let tx = self.tx.clone();
             let config_ref = Arc::clone(&self.config);
             let monitor_ref = Arc::clone(&self.monitor);
@@ -395,11 +395,35 @@ impl KeyboardHook {
                     continue;
                 }
 
+                // Create a single virtual uinput device for all keyboards
+                let mut uinput_builder = evdev::uinput::VirtualDeviceBuilder::new()
+                    .unwrap_or_else(|e| {
+                        crate::audit_log(&format!("[HOOK] Failed to init uinput builder: {}", e));
+                        panic!("uinput init fail");
+                    })
+                    .name("YATS Virtual Keyboard");
+
+                // Copy capabilities from the first device (or just add all common keyboard events)
+                // To be safe, we just enable all keys that we might ever want to forward.
+                uinput_builder = uinput_builder
+                    .with_keys(&evdev::AttributeSet::from_iter(
+                        (0..767).filter_map(|i| evdev::Key::new(i as u16)),
+                    ))
+                    .unwrap();
+
+                let mut virtual_device = uinput_builder.build().unwrap_or_else(|e| {
+                    crate::audit_log(&format!("[HOOK] Failed to build uinput device: {}", e));
+                    panic!("uinput build fail");
+                });
+
                 let mut threads = Vec::new();
+                let virtual_device = Arc::new(Mutex::new(virtual_device));
+
                 for mut device in devices {
                     let tx_inner = tx.clone();
                     let config_inner = Arc::clone(&config_ref);
                     let monitor_inner = Arc::clone(&monitor_ref);
+                    let v_dev = Arc::clone(&virtual_device);
 
                     threads.push(std::thread::spawn(move || {
                         let mut pressed_keys = std::collections::HashSet::new();
@@ -482,8 +506,9 @@ impl KeyboardHook {
                                         }
                                     }
                                 }
-                                // Pass through
-                                let _ = device.send_events(&[ev]);
+                                // Forward to virtual device
+                                let mut v = v_dev.lock().unwrap();
+                                let _ = v.emit(&[ev]);
                             }
                         }
                     }));
@@ -492,7 +517,7 @@ impl KeyboardHook {
                 for t in threads {
                     let _ = t.join();
                 }
-                crate::audit_log("[HOOK] Keyboards lost, rescanning...");
+                crate::audit_log("[HOOK] Keyboards lost or error, rescanning...");
                 std::thread::sleep(std::time::Duration::from_secs(2));
             }
         }

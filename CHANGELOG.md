@@ -5,6 +5,11 @@ All notable changes to YATS (Yet Another Touchpad Shortcut) will be documented i
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.7] - 2026-02-14
+
+### Fixed
+- **Linux キーボード無反応問題の修正**: キーボードの排他制御（Grab）時に、リマップ対象外のイベントを物理デバイスへ戻すのではなく、`/dev/uinput` による仮想キーボード経由でOSへ再注入するように改善。これにより、アプリ起動中にマウスやキーボードが操作不能になる問題を根本解決。
+
 ## [1.2.6] - 2026-02-14
 
 ### Fixed
