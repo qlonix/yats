@@ -395,7 +395,8 @@ impl KeyboardHook {
                         let mut pressed_keys = std::collections::HashSet::new();
                         loop {
                             match device.fetch_events() {
-                                Ok(events) => {
+                                Ok(events_iter) => {
+                                    let events: Vec<_> = events_iter.collect();
                                     for ev in events {
                                         if ev.event_type() == evdev::EventType::KEY {
                                             let code = ev.code(); // u16
