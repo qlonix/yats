@@ -116,7 +116,7 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
     let mut last_abs_y: Option<i32> = None;
     let mut accum_x: i32 = 0;
     let mut accum_y: i32 = 0;
-    let mut last_dir_y: i32 = 0;
+    let mut _last_dir_y: i32 = 0;
 
     loop {
         if let Ok(events) = device.fetch_events() {
@@ -144,7 +144,7 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                                         // 指が離れて別の場所に置かれたか、大きなノイズ
                                         accum_x = 0;
                                         accum_y = 0;
-                                        last_dir_y = 0;
+                                        _last_dir_y = 0;
                                     } else {
                                         accum_x += delta;
                                         if accum_x.abs() >= ACCUM_THRESHOLD {
@@ -172,7 +172,7 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                                     if delta.abs() >= JUMP_THRESHOLD {
                                         accum_x = 0;
                                         accum_y = 0;
-                                        last_dir_y = 0;
+                                        _last_dir_y = 0;
                                     } else {
                                         accum_y += delta;
                                         if accum_y.abs() >= ACCUM_THRESHOLD {
@@ -217,7 +217,7 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                         last_abs_y = None;
                         accum_x = 0;
                         accum_y = 0;
-                        last_dir_y = 0;
+                        _last_dir_y = 0;
                     }
 
                     // UI Update

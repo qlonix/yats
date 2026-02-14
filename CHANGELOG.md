@@ -5,11 +5,17 @@ All notable changes to YATS (Yet Another Touchpad Shortcut) will be documented i
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.2.14] - 2026-02-14
+## [1.2.15] - 2026-02-14
+
+### Added
+- **ローカル Linux ビルド環境の構築**: Docker および WSL を使用して、GitHub Actions を介さずにローカルで Linux 版バイナリ（.deb, .AppImage）をビルドできる環境を追加。
 
 ### Fixed
-- **Linux ビルドエラーの改善 (再修正)**: `evdev::Key` 列挙型の不適切な構築方法を修正し、物理デバイスから動的にキー構成をコピーするように変更。これによりコンパイルエラーを解消。
-- **Linux ビルドエラーの改善**: `Cargo.toml` から非推奨の `uinput` フィーチャー指定を削除し、`keyboard_hook.rs` の構文エラーを修正。これにより GitHub Actions でのビルドが不安定だった問題を解消。
+- **Linux ビルドエラーの修正**: `keyboard_hook.rs` において `uinput` ビルダーの `with_keys` 戻り値の処理漏れによるコンパイルエラーを修正。
+- **警告のクリーンアップ**: `linux.rs` 内の未使用変数 `last_dir_y` をリネームし、コンパイル警告を解消。
+
+### Changed
+- **ビルド環境のローカライズ**: `Dockerfile` やビルドスクリプト内のコメントを日本語に統一。
 
 ## [1.2.13] - 2026-02-14 [YANKED]
 

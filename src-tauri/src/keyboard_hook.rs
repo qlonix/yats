@@ -415,7 +415,9 @@ impl KeyboardHook {
                     }
                 }
 
-                uinput_builder = uinput_builder.with_keys(&keys);
+                uinput_builder = uinput_builder
+                    .with_keys(&keys)
+                    .expect("Failed to add keys to uinput builder");
 
                 let mut virtual_device = uinput_builder.build().unwrap_or_else(|e| {
                     crate::audit_log(&format!("[HOOK] Failed to build uinput device: {}", e));

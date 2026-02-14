@@ -1,0 +1,13 @@
+services:
+  build:
+    build: .
+    volumes:
+      - .:/app
+      - cargo-cache:/root/.cargo/registry
+      - target-cache:/app/src-tauri/target
+    environment:
+      - NODE_ENV=production
+
+volumes:
+  cargo-cache:
+  target-cache:
