@@ -5,6 +5,13 @@ All notable changes to YATS (Yet Another Touchpad Shortcut) will be documented i
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.6] - 2026-02-14
+
+### Fixed
+- **Linux スリープ復帰時の不具合修正**: Linux版のキーボードフックを X11 ベースの `rdev` からカーネルレベルの `evdev` 直接監視に移行。
+  - セッション切断の影響を受けなくなり、スリープ復帰時も自動的にデバイスを再検知して動作を継続するよう改善。
+  - キーボードデバイスの排他取得（Grab）により、より低遅延で安定したリマップを実現。
+
 ## [1.2.5] - 2026-02-14
 
 ### Fixed

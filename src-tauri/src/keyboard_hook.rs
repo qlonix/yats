@@ -192,7 +192,7 @@ impl HookWorker {
                         let speed = (global_speed as f32) / 100.0;
 
                         const LINEAR_SCALE: f32 = 40.0;
-                        let mut addition = delta * gain * speed * LINEAR_SCALE;
+                        let addition: f32; // Changed from mut
 
                         #[cfg(target_os = "linux")]
                         {
@@ -260,89 +260,214 @@ impl KeyboardHook {
     }
 
     pub fn start(&self) {
-        crate::audit_log("[HOOK] Starting keyboard hook (rdev::grab)...");
-        let tx = self.tx.clone();
-        let config_ref = Arc::clone(&self.config);
-        let monitor_ref = Arc::clone(&self.monitor);
+        #[cfg(not(target_os = "linux"))]
+        {
+            crate::audit_log("[HOOK] Starting keyboard hook (rdev::grab)...");
+            let tx = self.tx.clone();
+            let config_ref = Arc::clone(&self.config);
+            let monitor_ref = Arc::clone(&self.monitor);
 
-        loop {
-            let tx_inner = tx.clone();
-            let config_inner = Arc::clone(&config_ref);
-            let monitor_inner = Arc::clone(&monitor_ref);
-            let pressed_keys = Arc::new(Mutex::new(std::collections::HashSet::new()));
+            loop {
+                let tx_inner = tx.clone();
+                let config_inner = Arc::clone(&config_ref);
+                let monitor_inner = Arc::clone(&monitor_ref);
+                let pressed_keys = Arc::new(Mutex::new(std::collections::HashSet::new()));
 
-            crate::audit_log("[HOOK] Calling rdev::grab...");
-            if let Err(e) = rdev::grab(move |event| {
-                if IS_PAUSED.load(Ordering::SeqCst) || IS_SIMULATING.load(Ordering::SeqCst) {
-                    return Some(event);
-                }
-
-                match event.event_type {
-                    rdev::EventType::KeyPress(key) => {
-                        let mut keys = pressed_keys.lock().unwrap();
-                        if keys.contains(&key) {
-                            return None;
-                        }
-
-                        if !monitor_inner.is_touched() {
-                            return Some(event);
-                        }
-
-                        keys.insert(key);
-
-                        let action = {
-                            let cfg = config_inner.read().unwrap();
-                            cfg.mappings.get(&key).cloned()
-                        };
-
-                        if let Some(action) = action {
-                            match action {
-                                Action::MouseScroll(cfg) => {
-                                    monitor_inner.consume_y_delta();
-                                    let _ = tx_inner.send(RemapCommand::UpdateScroll(Some(cfg)));
-                                }
-                                _ => {
-                                    let _ = tx_inner.send(RemapCommand::Execute(action, true));
-                                }
-                            }
-                            return None;
-                        }
+                crate::audit_log("[HOOK] Calling rdev::grab...");
+                if let Err(e) = rdev::grab(move |event| {
+                    if IS_PAUSED.load(Ordering::SeqCst) || IS_SIMULATING.load(Ordering::SeqCst) {
+                        return Some(event);
                     }
-                    rdev::EventType::KeyRelease(key) => {
-                        let mut keys = pressed_keys.lock().unwrap();
-                        if !keys.remove(&key) {
-                            return Some(event);
-                        }
 
-                        let action = {
-                            let cfg = config_inner.read().unwrap();
-                            cfg.mappings.get(&key).cloned()
-                        };
-
-                        if let Some(action) = action {
-                            match action {
-                                Action::MouseScroll(_) => {
-                                    let _ = tx_inner.send(RemapCommand::UpdateScroll(None));
-                                }
-                                _ => {
-                                    let _ = tx_inner.send(RemapCommand::Execute(action, false));
-                                }
+                    match event.event_type {
+                        rdev::EventType::KeyPress(key) => {
+                            let mut keys = pressed_keys.lock().unwrap();
+                            if keys.contains(&key) {
+                                return None;
                             }
-                            return None;
+
+                            if !monitor_inner.is_touched() {
+                                return Some(event);
+                            }
+
+                            keys.insert(key);
+
+                            let action = {
+                                let cfg = config_inner.read().unwrap();
+                                cfg.mappings.get(&key).cloned()
+                            };
+
+                            if let Some(action) = action {
+                                match action {
+                                    Action::MouseScroll(cfg) => {
+                                        monitor_inner.consume_y_delta();
+                                        let _ = tx_inner.send(RemapCommand::UpdateScroll(Some(cfg)));
+                                    }
+                                    _ => {
+                                        let _ = tx_inner.send(RemapCommand::Execute(action, true));
+                                    }
+                                }
+                                return None;
+                            }
                         }
+                        rdev::EventType::KeyRelease(key) => {
+                            let mut keys = pressed_keys.lock().unwrap();
+                            if !keys.remove(&key) {
+                                return Some(event);
+                            }
+
+                            let action = {
+                                let cfg = config_inner.read().unwrap();
+                                cfg.mappings.get(&key).cloned()
+                            };
+
+                            if let Some(action) = action {
+                                match action {
+                                    Action::MouseScroll(_) => {
+                                        let _ = tx_inner.send(RemapCommand::UpdateScroll(None));
+                                    }
+                                    _ => {
+                                        let _ = tx_inner.send(RemapCommand::Execute(action, false));
+                                    }
+                                }
+                                return None;
+                            }
+                        }
+                        _ => {}
                     }
-                    _ => {}
+                    Some(event)
+                }) {
+                    crate::audit_log(&format!("[HOOK] rdev::grab error: {:?}. Retrying in 3s...", e));
+                    eprintln!("[HOOK] Error: {:?}. Retrying...", e);
                 }
-                Some(event)
-            }) {
-                crate::audit_log(&format!(
-                    "[HOOK] rdev::grab error: {:?}. Retrying in 3s...",
-                    e
-                ));
-                eprintln!("[HOOK] Error: {:?}. Retrying...", e);
+                crate::audit_log("[HOOK] Keyboard hook exited, restarting in 3s...");
+                std::thread::sleep(std::time::Duration::from_secs(3));
             }
-            crate::audit_log("[HOOK] Keyboard hook exited, restarting in 3s...");
-            std::thread::sleep(std::time::Duration::from_secs(3));
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            crate::audit_log("[HOOK] Starting Linux Keyboard Hook (evdev)...");
+            let tx = self.tx.clone();
+            let config_ref = Arc::clone(&self.config);
+            let monitor_ref = Arc::clone(&self.monitor);
+
+            loop {
+                // Find all keyboards
+                let mut devices = Vec::new();
+                if let Ok(dir) = std::fs::read_dir("/dev/input") {
+                    for entry in dir.flatten() {
+                        let path = entry.path();
+                        if path.to_string_lossy().contains("event") {
+                            if let Ok(mut device) = evdev::Device::open(&path) {
+                                let caps = device.supported_events();
+                                let name = device.name().unwrap_or("Unknown").to_lowercase();
+                                
+                                // Only true keyboards (must have KEY events and some specific keys)
+                                if caps.contains(evdev::EventType::KEY) && !name.contains("touchpad") && !name.contains("mouse") {
+                                    // Grab it!
+                                    if device.grab().is_ok() {
+                                        crate::audit_log(&format!("[HOOK] Grabbed keyboard: {}", name));
+                                        devices.push(device);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if devices.is_empty() {
+                    crate::audit_log("[HOOK] No keyboard found to grab. Retrying in 5s...");
+                    std::thread::sleep(std::time::Duration::from_secs(5));
+                    continue;
+                }
+
+                let mut threads = Vec::new();
+                for mut device in devices {
+                    let tx_inner = tx.clone();
+                    let config_inner = Arc::clone(&config_ref);
+                    let monitor_inner = Arc::clone(&monitor_ref);
+                    
+                    threads.push(std::thread::spawn(move || {
+                        let mut pressed_keys = std::collections::HashSet::new();
+                        loop {
+                            match device.fetch_events() {
+                                Ok(events) => {
+                                    for ev in events {
+                                        if ev.event_type() == evdev::EventType::KEY {
+                                            let code = ev.code();
+                                            let value = ev.value(); // 0: Release, 1: Press, 2: Repeat
+                                            
+                                            // Map evdev code to rdev Key
+                                            if let Some(rkey) = evdev_to_rdev_key(code) {
+                                                let is_remap = {
+                                                    let cfg = config_inner.read().unwrap();
+                                                    cfg.mappings.contains_key(&rkey)
+                                                };
+
+                                                let touched = monitor_inner.is_touched();
+                                                let paused = IS_PAUSED.load(Ordering::SeqCst);
+                                                let simulating = IS_SIMULATING.load(Ordering::SeqCst);
+
+                                                if is_remap && touched && !paused && !simulating {
+                                                    if value == 1 {
+                                                        // Press
+                                                        pressed_keys.insert(rkey);
+                                                        let action = {
+                                                            let cfg = config_inner.read().unwrap();
+                                                            cfg.mappings.get(&rkey).cloned()
+                                                        };
+                                                        if let Some(action) = action {
+                                                            match action {
+                                                                Action::MouseScroll(cfg) => {
+                                                                    monitor_inner.consume_y_delta();
+                                                                    let _ = tx_inner.send(RemapCommand::UpdateScroll(Some(cfg)));
+                                                                }
+                                                                _ => {
+                                                                    let _ = tx_inner.send(RemapCommand::Execute(action, true));
+                                                                }
+                                                            }
+                                                        }
+                                                    } else if value == 0 {
+                                                        // Release
+                                                        if pressed_keys.remove(&rkey) {
+                                                            let action = {
+                                                                let cfg = config_inner.read().unwrap();
+                                                                cfg.mappings.get(&rkey).cloned()
+                                                            };
+                                                            if let Some(action) = action {
+                                                                match action {
+                                                                    Action::MouseScroll(_) => {
+                                                                        let _ = tx_inner.send(RemapCommand::UpdateScroll(None));
+                                                                    }
+                                                                    _ => {
+                                                                        let _ = tx_inner.send(RemapCommand::Execute(action, false));
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                    // Consume event (do not pass through)
+                                                    continue;
+                                                }
+                                            }
+                                        }
+                                        // Pass through
+                                        let _ = device.send_events(&[ev]);
+                                    }
+                                }
+                                Err(_) => break, // Device lost
+                            }
+                        }
+                    }));
+                }
+
+                for t in threads {
+                    let _ = t.join();
+                }
+                crate::audit_log("[HOOK] Keyboards lost, rescanning...");
+                std::thread::sleep(std::time::Duration::from_secs(2));
+            }
         }
     }
 }
@@ -414,4 +539,85 @@ fn interpolate_curve(curve: &[(f32, f32)], input: f32) -> f32 {
     }
 
     y[n - 1]
+}
+
+#[cfg(target_os = "linux")]
+fn evdev_to_rdev_key(code: evdev::Key) -> Option<rdev::Key> {
+    use rdev::Key;
+    match code.code() {
+        1 => Some(Key::Escape),
+        2 => Some(Key::Num1),
+        3 => Some(Key::Num2),
+        4 => Some(Key::Num3),
+        5 => Some(Key::Num4),
+        6 => Some(Key::Num5),
+        7 => Some(Key::Num6),
+        8 => Some(Key::Num7),
+        9 => Some(Key::Num8),
+        10 => Some(Key::Num9),
+        11 => Some(Key::Num0),
+        12 => Some(Key::Minus),
+        13 => Some(Key::Equal),
+        14 => Some(Key::Backspace),
+        15 => Some(Key::Tab),
+        16 => Some(Key::KeyQ),
+        17 => Some(Key::KeyW),
+        18 => Some(Key::KeyE),
+        19 => Some(Key::KeyR),
+        20 => Some(Key::KeyT),
+        21 => Some(Key::KeyY),
+        22 => Some(Key::KeyU),
+        23 => Some(Key::KeyI),
+        24 => Some(Key::KeyO),
+        25 => Some(Key::KeyP),
+        26 => Some(Key::LeftBracket),
+        27 => Some(Key::RightBracket),
+        28 => Some(Key::Return),
+        29 => Some(Key::ControlLeft),
+        30 => Some(Key::KeyA),
+        31 => Some(Key::KeyS),
+        32 => Some(Key::KeyD),
+        33 => Some(Key::KeyF),
+        34 => Some(Key::KeyG),
+        35 => Some(Key::KeyH),
+        36 => Some(Key::KeyJ),
+        37 => Some(Key::KeyK),
+        38 => Some(Key::KeyL),
+        39 => Some(Key::SemiColon),
+        40 => Some(Key::Quote),
+        41 => Some(Key::BackQuote),
+        42 => Some(Key::ShiftLeft),
+        43 => Some(Key::BackSlash),
+        44 => Some(Key::KeyZ),
+        45 => Some(Key::KeyX),
+        46 => Some(Key::KeyC),
+        47 => Some(Key::KeyV),
+        48 => Some(Key::KeyB),
+        49 => Some(Key::KeyN),
+        50 => Some(Key::KeyM),
+        51 => Some(Key::Comma),
+        52 => Some(Key::Dot),
+        53 => Some(Key::Slash),
+        54 => Some(Key::ShiftRight),
+        56 => Some(Key::Alt),
+        57 => Some(Key::Space),
+        58 => Some(Key::CapsLock),
+        59 => Some(Key::F1),
+        60 => Some(Key::F2),
+        61 => Some(Key::F3),
+        62 => Some(Key::F4),
+        63 => Some(Key::F5),
+        64 => Some(Key::F6),
+        65 => Some(Key::F7),
+        66 => Some(Key::F8),
+        67 => Some(Key::F9),
+        68 => Some(Key::F10),
+        103 => Some(Key::UpArrow),
+        105 => Some(Key::LeftArrow),
+        106 => Some(Key::RightArrow),
+        108 => Some(Key::DownArrow),
+        125 => Some(Key::MetaLeft),
+        126 => Some(Key::MetaRight),
+        _ => None,
+    }
 }
