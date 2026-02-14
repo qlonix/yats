@@ -1,6 +1,6 @@
 [package]
 name = "yats"
-version = "1.2.10"
+version = "1.2.11"
 description = "Yet Another Touchpad Shortcut"
 authors = ["Antigravity"]
 edition = "2021"

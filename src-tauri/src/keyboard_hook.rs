@@ -370,8 +370,10 @@ impl KeyboardHook {
                                 let caps = device.supported_events();
                                 let name = device.name().unwrap_or("Unknown").to_lowercase();
 
-                                // Only true keyboards (must have KEY events and some specific keys)
+                                // Only true keyboards (must have KEY events, but NOT RELATIVE or ABSOLUTE pointing axes)
                                 if caps.contains(evdev::EventType::KEY)
+                                    && !caps.contains(evdev::EventType::RELATIVE)
+                                    && !caps.contains(evdev::EventType::ABSOLUTE)
                                     && !name.contains("touchpad")
                                     && !name.contains("mouse")
                                 {
