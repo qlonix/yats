@@ -343,10 +343,19 @@ const CurveEditor = ({ points, onChange }) => {
 
   const handleClickLine = (e) => {
     const rect = svgRef.current.getBoundingClientRect();
-    const x = fromSvgX(e.clientX - rect.left);
-    const y = fromSvgY(e.clientY - rect.top);
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
 
-    if (sortedPoints.some(p => Math.abs(toSvgX(p[0]) - (e.clientX - rect.left)) < 15)) return;
+    // Reject clicks outside the active margin area
+    if (sx < margin || sx > width - margin || sy < margin || sy > height - margin) return;
+
+    let x = fromSvgX(sx);
+    let y = fromSvgY(sy);
+
+    x = Math.max(0, Math.min(maxX, x));
+    y = Math.max(0, Math.min(maxY, y));
+
+    if (sortedPoints.some(p => Math.abs(toSvgX(p[0]) - sx) < 15)) return;
 
     const newPoints = [...sortedPoints, [x, y]];
     onChange(newPoints);
@@ -612,7 +621,7 @@ function App() {
             <h2>About YATS</h2>
             <p><strong>YATS</strong> stands for:</p>
             <p className="yats-full-name">Yet Another Touchpad Shortcut</p>
-            <p className="version-info">Version 1.2.4</p>
+            <p className="version-info">Version 1.2.6</p>
             <button className="btn-close-modal" onClick={() => setShowAbout(false)}>Close</button>
           </div>
         </div>
@@ -808,13 +817,25 @@ function App() {
                         onChange={(e) => {
                           const val = parseFloat(e.target.value);
                           setLinuxMaxScrollSpeed(val);
-                          saveConfig(null, null, null, null, null, { max_scroll_speed: val });
+                          // Sync with Curve's last point
+                          let newCurve = [...linuxScrollCurve];
+                          if (newCurve.length > 0) {
+                            newCurve[newCurve.length - 1][1] = val;
+                            setLinuxScrollCurve(newCurve);
+                          }
+                          saveConfig(null, null, null, null, null, { max_scroll_speed: val, curve: newCurve.length > 0 ? newCurve : null });
                         }}
                       />
                       <input type="number" value={linuxMaxScrollSpeed} onChange={(e) => {
                         const val = parseFloat(e.target.value) || 0;
                         setLinuxMaxScrollSpeed(val);
-                        saveConfig(null, null, null, null, null, { max_scroll_speed: val });
+                        // Sync with Curve's last point
+                        let newCurve = [...linuxScrollCurve];
+                        if (newCurve.length > 0) {
+                          newCurve[newCurve.length - 1][1] = val;
+                          setLinuxScrollCurve(newCurve);
+                        }
+                        saveConfig(null, null, null, null, null, { max_scroll_speed: val, curve: newCurve.length > 0 ? newCurve : null });
                       }} />
                     </div>
                   </div>
@@ -825,8 +846,17 @@ function App() {
                   <CurveEditor
                     points={linuxScrollCurve}
                     onChange={(newPoints) => {
-                      setLinuxScrollCurve(newPoints);
-                      saveConfig(null, null, null, null, null, { curve: newPoints });
+                      const sorted = [...newPoints].sort((a, b) => a[0] - b[0]);
+                      setLinuxScrollCurve(sorted);
+
+                      // Sync last point with max_scroll_speed
+                      let maxSpeed = linuxMaxScrollSpeed;
+                      if (sorted.length > 0) {
+                        maxSpeed = sorted[sorted.length - 1][1];
+                        setLinuxMaxScrollSpeed(maxSpeed);
+                      }
+
+                      saveConfig(null, null, null, null, null, { curve: sorted, max_scroll_speed: maxSpeed });
                     }}
                   />
                   <p className="hint-text">Drag points to adjust curve. Click on line to add points. Right click points to remove.</p>

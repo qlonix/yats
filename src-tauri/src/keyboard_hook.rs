@@ -190,30 +190,33 @@ impl HookWorker {
                     if self.is_scrolling {
                         let gain = (global_sens as f32) / 100.0;
                         let speed = (global_speed as f32) / 100.0;
-
                         const LINEAR_SCALE: f32 = 40.0;
-                        let addition: f32; // Changed from mut
 
                         #[cfg(target_os = "linux")]
-                        {
+                        let addition = {
                             if _use_curve && !_curve.is_empty() {
                                 // Curve based scaling
                                 let input_speed = (delta / _dt).abs();
                                 let output_speed = interpolate_curve(&_curve, input_speed);
-
+                                
                                 // output_total = output_speed * dt
                                 // Maintain direction
-                                addition = delta.signum() * output_speed * _dt;
+                                delta.signum() * output_speed * _dt
                             } else {
                                 // Linear based scaling (existing logic)
-                                let current_out_speed = addition.abs() / 0.008;
+                                let mut temp_addition = delta * gain * speed * LINEAR_SCALE;
+                                let current_out_speed = temp_addition.abs() / 0.008;
                                 if current_out_speed < _min_scroll && current_out_speed > 0.0 {
-                                    addition = addition.signum() * _min_scroll * 0.008;
+                                    temp_addition = temp_addition.signum() * _min_scroll * 0.008;
                                 } else if current_out_speed > _max_scroll {
-                                    addition = addition.signum() * _max_scroll * 0.008;
+                                    temp_addition = temp_addition.signum() * _max_scroll * 0.008;
                                 }
+                                temp_addition
                             }
-                        }
+                        };
+
+                        #[cfg(not(target_os = "linux"))]
+                        let addition = delta * gain * speed * LINEAR_SCALE;
 
                         self.accumulator_y += addition;
                     }
@@ -395,8 +398,8 @@ impl KeyboardHook {
                                 Ok(events) => {
                                     for ev in events {
                                         if ev.event_type() == evdev::EventType::KEY {
-                                            let code = ev.code();
-                                            let value = ev.value(); // 0: Release, 1: Press, 2: Repeat
+                                            let code = ev.code(); // u16
+                                            let value = ev.value(); // i32: 0, 1, or 2
                                             
                                             // Map evdev code to rdev Key
                                             if let Some(rkey) = evdev_to_rdev_key(code) {
@@ -472,6 +475,7 @@ impl KeyboardHook {
     }
 }
 
+#[cfg(target_os = "linux")]
 fn interpolate_curve(curve: &[(f32, f32)], input: f32) -> f32 {
     if curve.is_empty() {
         return input;
@@ -542,9 +546,9 @@ fn interpolate_curve(curve: &[(f32, f32)], input: f32) -> f32 {
 }
 
 #[cfg(target_os = "linux")]
-fn evdev_to_rdev_key(code: evdev::Key) -> Option<rdev::Key> {
+fn evdev_to_rdev_key(code: u16) -> Option<rdev::Key> {
     use rdev::Key;
-    match code.code() {
+    match code {
         1 => Some(Key::Escape),
         2 => Some(Key::Num1),
         3 => Some(Key::Num2),
