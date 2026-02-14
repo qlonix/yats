@@ -451,7 +451,7 @@ function App() {
       const updated = {
         mappings: overrides.mappings !== undefined ? overrides.mappings : mappings,
         release_delay_ms: overrides.releaseDelay !== undefined ? parseInt(overrides.releaseDelay) : releaseDelay,
-        scroll_sensitivity: 100, // Fixed as per user request
+        scroll_sensitivity: 200, // Fixed as per user request
         scroll_speed: 50, // Fixed as per user request
         scroll_invert: overrides.scrollInvert !== undefined ? overrides.scrollInvert : scrollInvert,
         linux_min_distance: overrides.linuxMinDistance !== undefined ? overrides.linuxMinDistance : linuxMinDistance,
@@ -651,8 +651,9 @@ function App() {
                         saveConfigWithLatest({ linuxMinDistance: val });
                       }}
                     />
-                    <input type="number" value={linuxMinDistance} onChange={(e) => {
-                      const val = parseInt(e.target.value) || 0;
+                    <input type="number" min="0" value={linuxMinDistance} onChange={(e) => {
+                      let val = parseInt(e.target.value);
+                      if (isNaN(val) || val < 0) val = 0;
                       setLinuxMinDistance(val);
                       saveConfigWithLatest({ linuxMinDistance: val });
                     }} />
@@ -672,8 +673,9 @@ function App() {
                         saveConfigWithLatest({ linuxMinScrollSpeed: val });
                       }}
                     />
-                    <input type="number" value={linuxMinScrollSpeed} onChange={(e) => {
-                      const val = parseFloat(e.target.value) || 0;
+                    <input type="number" min="0" value={linuxMinScrollSpeed} onChange={(e) => {
+                      let val = parseFloat(e.target.value);
+                      if (isNaN(val) || val < 0) val = 0;
                       setLinuxMinScrollSpeed(val);
                       saveConfigWithLatest({ linuxMinScrollSpeed: val });
                     }} />
@@ -690,13 +692,19 @@ function App() {
                       onChange={(e) => {
                         const val = parseFloat(e.target.value);
                         setLinuxMaxScrollSpeed(val);
-                        saveConfigWithLatest({ linuxMaxScrollSpeed: val });
+                        // Also clamp the existing curve points if they exceed the new max
+                        const clamped = linuxScrollCurve.map(p => [p[0], Math.min(p[1], val)]);
+                        setLinuxScrollCurve(clamped);
+                        saveConfigWithLatest({ linuxMaxScrollSpeed: val, linuxScrollCurve: clamped });
                       }}
                     />
-                    <input type="number" value={linuxMaxScrollSpeed} onChange={(e) => {
-                      const val = parseFloat(e.target.value) || 0;
+                    <input type="number" min="100" value={linuxMaxScrollSpeed} onChange={(e) => {
+                      let val = parseFloat(e.target.value);
+                      if (isNaN(val) || val < 100) val = 100;
                       setLinuxMaxScrollSpeed(val);
-                      saveConfigWithLatest({ linuxMaxScrollSpeed: val });
+                      const clamped = linuxScrollCurve.map(p => [p[0], Math.min(p[1], val)]);
+                      setLinuxScrollCurve(clamped);
+                      saveConfigWithLatest({ linuxMaxScrollSpeed: val, linuxScrollCurve: clamped });
                     }} />
                   </div>
                 </div>
