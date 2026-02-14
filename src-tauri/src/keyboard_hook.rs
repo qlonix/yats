@@ -405,11 +405,18 @@ impl KeyboardHook {
 
                 // Copy capabilities from the first device (or just add all common keyboard events)
                 // To be safe, we just enable all keys that we might ever want to forward.
-                uinput_builder = uinput_builder
-                    .with_keys(&evdev::AttributeSet::from_iter(
-                        (0..767).filter_map(|i| evdev::Key::new(i as u16)),
-                    ))
-                    .unwrap();
+                let mut keys = evdev::AttributeSet::<evdev::Key>::default();
+                for i in 0..0x2ff {
+                    keys.insert(evdev::Key(i as u16));
+                }
+
+                uinput_builder = match uinput_builder.with_keys(&keys) {
+                    Ok(b) => b,
+                    Err(e) => {
+                        crate::audit_log(&format!("[HOOK] uinput with_keys error: {}", e));
+                        panic!("uinput keys fail");
+                    }
+                };
 
                 let mut virtual_device = uinput_builder.build().unwrap_or_else(|e| {
                     crate::audit_log(&format!("[HOOK] Failed to build uinput device: {}", e));

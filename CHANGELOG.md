@@ -5,6 +5,11 @@ All notable changes to YATS (Yet Another Touchpad Shortcut) will be documented i
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.9] - 2026-02-14
+
+### Fixed
+- **Linux ビルド環境への対応強化**: `evdev` の `uinput` ビルダーおよび `AttributeSet` の操作方法を、より互換性の高い構文に修正。
+
 ## [1.2.8] - 2026-02-14
 
 ### Fixed
