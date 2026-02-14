@@ -20,4 +20,5 @@
 - **コード類に変更があった場合は、都度 GitHub へプッシュ（git push）を行う。**
 - **GitHubのReleasesは指示があるまで追加/変更しない。**
 - **GitHubのReleasesのAssetsへの追加・アップデートは指示があるまで行わない。**
+- **Windows 版のビルドはローカルだけで行う。GitHub Actions でのビルドは禁止する。**
 - **変更履歴を `CHANGELOG.md` に記載していく。**
