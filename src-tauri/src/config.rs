@@ -144,7 +144,7 @@ impl Default for AppConfig {
             linux_min_speed: 0.0,
             linux_min_scroll_speed: 0.0,
             linux_max_scroll_speed: 800.0,
-            linux_use_scroll_curve: false,
+            linux_use_scroll_curve: true,
             linux_scroll_curve: default_linux_scroll_curve(),
         }
     }

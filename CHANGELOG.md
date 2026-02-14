@@ -5,7 +5,16 @@ All notable changes to YATS (Yet Another Touchpad Shortcut) will be documented i
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.2.11] - 2026-02-14
+## [1.2.12] - 2026-02-14
+
+### Changed
+- **Linux スクロール設定の統合**: 「Global Scroll Settings」と「Linux Scroll Tuning (Curve)」画面を統合。感度曲線（Curve）を基本モデルとし、UIを簡略化。
+- **UIの改善**: `Max Scroll Output Speed` を感度曲線の y 軸上限と連動。設定項目（Sensitivity, Scroll Speed, Min Mouse Speed）を固定値化し UI から削除。
+
+### Fixed
+- **設定保存の正確性向上**: 設定保存時の競合（Race Condition）を解消し、スクロール設定が確実に保存されるように修正。
+- **Linux ビルドエラーの修正**: `Cargo.toml` において `evdev` の `uinput` フィーチャーを再度有効化。
+
 
 ### Fixed
 - **Linux マウスロック問題の修正**: キーボードフック対象の自動判定ロジックを強化。相対/絶対座標を持つのポインティングデバイス（マウス・タッチパッド）を明示的に除外することで、起動時にマウスが操作不能になる問題を修正。

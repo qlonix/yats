@@ -234,16 +234,15 @@ const YatsLogo = () => (
   </svg>
 );
 
-const CurveEditor = ({ points, onChange }) => {
+const CurveEditor = ({ points, onChange, maxY = 2000 }) => {
   const [draggingIdx, setDraggingIdx] = useState(null);
   const svgRef = useRef(null);
-  const width = 450;
-  const height = 280;
-  const margin = 35;
+  const width = 480;
+  const height = 300;
+  const margin = 40;
 
-  // Max values for scale
+  // X is fixed to 2000 for mouse speed, Y is dynamic
   const maxX = 2000;
-  const maxY = 2000;
 
   const toSvgX = (x) => margin + (x / maxX) * (width - 2 * margin);
   const toSvgY = (y) => height - margin - (y / maxY) * (height - 2 * margin);
@@ -251,22 +250,20 @@ const CurveEditor = ({ points, onChange }) => {
   const fromSvgY = (sy) => ((height - margin - sy) / (height - 2 * margin)) * maxY;
 
   const sortedPoints = [...points].sort((a, b) => a[0] - b[0]);
+  const n = sortedPoints.length;
 
   // Monotone Cubic Spline implementation for preview
   const getSplinePoints = () => {
-    const n = sortedPoints.length;
     if (n < 2) return [];
 
     const x = sortedPoints.map(p => p[0]);
     const y = sortedPoints.map(p => p[1]);
 
-    // Secants
     const d = [];
     for (let i = 0; i < n - 1; i++) {
       d.push((y[i + 1] - y[i]) / (x[i + 1] - x[i]));
     }
 
-    // Slopes
     const m = new Array(n).fill(0);
     m[0] = d[0];
     for (let i = 1; i < n - 1; i++) {
@@ -274,7 +271,6 @@ const CurveEditor = ({ points, onChange }) => {
     }
     m[n - 1] = d[n - 2];
 
-    // Monotonicity adjustment
     for (let i = 0; i < n - 1; i++) {
       if (d[i] === 0) {
         m[i] = 0;
@@ -291,11 +287,11 @@ const CurveEditor = ({ points, onChange }) => {
       }
     }
 
-    // Interpolation for path
     const pathPoints = [];
-    const steps = 100;
+    const steps = 60;
     for (let i = 0; i < n - 1; i++) {
       const h = x[i + 1] - x[i];
+      if (h <= 0) continue;
       for (let j = 0; j <= steps; j++) {
         const stepX = x[i] + (h * j) / steps;
         const t = (stepX - x[i]) / h;
@@ -330,8 +326,8 @@ const CurveEditor = ({ points, onChange }) => {
     y = Math.max(0, Math.min(maxY, y));
 
     // Constraint: don't cross neighbors
-    if (draggingIdx > 0) x = Math.max(newPoints[draggingIdx - 1][0] + 1, x);
-    if (draggingIdx < n - 1) x = Math.min(newPoints[draggingIdx + 1][0] - 1, x);
+    if (draggingIdx > 0) x = Math.max(newPoints[draggingIdx - 1][0] + 5, x);
+    if (draggingIdx < n - 1) x = Math.min(newPoints[draggingIdx + 1][0] - 5, x);
 
     newPoints[draggingIdx] = [x, y];
     onChange(newPoints);
@@ -342,11 +338,11 @@ const CurveEditor = ({ points, onChange }) => {
   };
 
   const handleClickLine = (e) => {
+    if (draggingIdx !== null) return;
     const rect = svgRef.current.getBoundingClientRect();
     const sx = e.clientX - rect.left;
     const sy = e.clientY - rect.top;
 
-    // Reject clicks outside the active margin area
     if (sx < margin || sx > width - margin || sy < margin || sy > height - margin) return;
 
     let x = fromSvgX(sx);
@@ -375,8 +371,6 @@ const CurveEditor = ({ points, onChange }) => {
     splineData.slice(1).map(p => `L ${toSvgX(p[0])} ${toSvgY(p[1])}`).join(' ')
     : "";
 
-  const n = sortedPoints.length;
-
   return (
     <div className="curve-editor-wrapper" onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
       <svg
@@ -384,35 +378,42 @@ const CurveEditor = ({ points, onChange }) => {
         width={width}
         height={height}
         onMouseMove={handleMouseMove}
-        onClick={(e) => draggingIdx === null && handleClickLine(e)}
-        style={{ background: "#111", borderRadius: "8px", cursor: draggingIdx !== null ? "grabbing" : "crosshair" }}
+        onClick={handleClickLine}
+        style={{ background: "rgba(0,0,0,0.3)", borderRadius: "12px", cursor: draggingIdx !== null ? "grabbing" : "crosshair" }}
       >
         {/* Grid lines */}
         {[0, 0.25, 0.5, 0.75, 1].map(v => (
           <g key={v}>
-            <line x1={margin} y1={toSvgY(v * maxY)} x2={width - margin} y2={toSvgY(v * maxY)} stroke="#222" strokeWidth="1" />
-            <line x1={toSvgX(v * maxX)} y1={margin} x2={toSvgX(v * maxX)} y2={height - margin} stroke="#222" strokeWidth="1" />
-            <text x={margin - 5} y={toSvgY(v * maxY)} fill="#444" fontSize="9" textAnchor="end" alignmentBaseline="middle">{Math.round(v * maxY)}</text>
-            <text x={toSvgX(v * maxX)} y={height - margin + 15} fill="#444" fontSize="9" textAnchor="middle">{Math.round(v * maxX)}</text>
+            <line x1={margin} y1={toSvgY(v * maxY)} x2={width - margin} y2={toSvgY(v * maxY)} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+            <line x1={toSvgX(v * maxX)} y1={margin} x2={toSvgX(v * maxX)} y2={height - margin} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+            <text x={margin - 8} y={toSvgY(v * maxY)} fill="#666" fontSize="10" textAnchor="end" alignmentBaseline="middle">{Math.round(v * maxY)}</text>
+            <text x={toSvgX(v * maxX)} y={height - margin + 18} fill="#666" fontSize="10" textAnchor="middle">{Math.round(v * maxX)}</text>
           </g>
         ))}
 
-        {/* Labels */}
-        <text x={width / 2} y={height - 5} fill="#666" fontSize="10" textAnchor="middle">Input Mouse Speed (pixels/sec)</text>
-        <text x={10} y={height / 2} fill="#666" fontSize="10" transform={`rotate(-90, 10, ${height / 2})`} textAnchor="middle">Output Scroll Speed</text>
+        <text x={width / 2} y={height - 8} fill="#888" fontSize="11" textAnchor="middle">Input Mouse Speed (px/s)</text>
+        <text x={12} y={height / 2} fill="#888" fontSize="11" transform={`rotate(-90, 12, ${height / 2})`} textAnchor="middle">Scroll Output</text>
 
-        {/* Curve Path */}
-        <path d={pathData} fill="none" stroke="#00d2ff" strokeWidth="2.5" strokeLinejoin="round" />
+        <path d={pathData} fill="none" stroke="url(#curveGrad)" strokeWidth="3" strokeLinejoin="round" filter="url(#glow)" />
+        <defs>
+          <linearGradient id="curveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style={{ stopColor: "#00d2ff" }} />
+            <stop offset="100%" style={{ stopColor: "#3a7bd5" }} />
+          </linearGradient>
+          <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+            <blur stdDeviation="2" result="blur" />
+            <composite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+        </defs>
 
-        {/* Points */}
         {sortedPoints.map((p, i) => (
           <circle
             key={i}
             cx={toSvgX(p[0])}
             cy={toSvgY(p[1])}
-            r={draggingIdx === i ? 7 : 5}
+            r={draggingIdx === i ? 8 : 6}
             fill={draggingIdx === i ? "#fff" : "#00d2ff"}
-            stroke={draggingIdx === i ? "#00d2ff" : "none"}
+            stroke="rgba(255,255,255,0.2)"
             strokeWidth="2"
             onMouseDown={(e) => handleMouseDown(e, i)}
             onContextMenu={(e) => handleContextMenu(e, i)}
@@ -435,18 +436,37 @@ function App() {
   const [isPaused, setIsPaused] = useState(false);
   const [autoStart, setAutoStart] = useState(false);
   const [recordingMacroKey, setRecordingMacroKey] = useState(null);
-  const [showScrollSettings, setShowScrollSettings] = useState(false);
-  const [showLinuxScrollDetail, setShowLinuxScrollDetail] = useState(false);
-  const [scrollSensitivity, setScrollSensitivity] = useState(100);
-  const [scrollSpeed, setScrollSpeed] = useState(50);
+  const [showScrollTuning, setShowScrollTuning] = useState(false);
   const [scrollInvert, setScrollInvert] = useState(false);
   const [linuxMinDistance, setLinuxMinDistance] = useState(0);
-  const [linuxMinSpeed, setLinuxMinSpeed] = useState(0.0);
   const [linuxMinScrollSpeed, setLinuxMinScrollSpeed] = useState(0);
   const [linuxMaxScrollSpeed, setLinuxMaxScrollSpeed] = useState(800);
-  const [linuxUseScrollCurve, setLinuxUseScrollCurve] = useState(false);
   const [linuxScrollCurve, setLinuxScrollCurve] = useState([]);
 
+  // Centralized robust save function
+  const saveConfigWithLatest = async (overrides = {}) => {
+    try {
+      // Construction from latest state + overrides
+      // This avoids the "get_config then modify" race condition.
+      const updated = {
+        mappings: overrides.mappings !== undefined ? overrides.mappings : mappings,
+        release_delay_ms: overrides.releaseDelay !== undefined ? parseInt(overrides.releaseDelay) : releaseDelay,
+        scroll_sensitivity: 100, // Fixed as per user request
+        scroll_speed: 50, // Fixed as per user request
+        scroll_invert: overrides.scrollInvert !== undefined ? overrides.scrollInvert : scrollInvert,
+        linux_min_distance: overrides.linuxMinDistance !== undefined ? overrides.linuxMinDistance : linuxMinDistance,
+        linux_min_speed: 0.0, // Fixed as per user request
+        linux_min_scroll_speed: overrides.linuxMinScrollSpeed !== undefined ? overrides.linuxMinScrollSpeed : linuxMinScrollSpeed,
+        linux_max_scroll_speed: overrides.linuxMaxScrollSpeed !== undefined ? overrides.linuxMaxScrollSpeed : linuxMaxScrollSpeed,
+        linux_use_scroll_curve: true, // Fixed as baseline
+        linux_scroll_curve: overrides.linuxScrollCurve !== undefined ? overrides.linuxScrollCurve : linuxScrollCurve,
+      };
+
+      await invoke("set_config", { newConfig: updated });
+    } catch (err) {
+      console.error("Failed to save config:", err);
+    }
+  };
 
   const loadConfig = async () => {
     try {
@@ -458,10 +478,7 @@ function App() {
         if (Array.isArray(entry)) {
           entry = entry[0] || { type: "MouseClick", value: "Left" };
         }
-
-        // Migration: KeyMacro normalization for v0.4.8-1
         if (entry.type === "KeyMacro") {
-          // If it's a flat array (old format), wrap each key in its own step-array
           if (entry.value && entry.value.length > 0 && typeof entry.value[0] === 'string') {
             entry.value = entry.value.map(k => [k]);
           } else if (!entry.value) {
@@ -472,15 +489,13 @@ function App() {
       });
       setMappings(normalized);
       setReleaseDelay(config.release_delay_ms || 200);
-      setScrollSensitivity(config.scroll_sensitivity || 100);
-      setScrollSpeed(config.scroll_speed || 50);
       setScrollInvert(config.scroll_invert || false);
       setLinuxMinDistance(config.linux_min_distance || 0);
-      setLinuxMinSpeed(config.linux_min_speed || 0.0);
       setLinuxMinScrollSpeed(config.linux_min_scroll_speed ?? 0);
       setLinuxMaxScrollSpeed(config.linux_max_scroll_speed ?? 800);
-      setLinuxUseScrollCurve(config.linux_use_scroll_curve ?? false);
-      setLinuxScrollCurve(config.linux_scroll_curve ?? []);
+      setLinuxScrollCurve(config.linux_scroll_curve && config.linux_scroll_curve.length > 0 ? config.linux_scroll_curve : [
+        [0, 0], [500, 500], [1000, 1000], [2000, 2000]
+      ]);
     } catch (err) {
       console.error("Failed to load config:", err);
     }
@@ -488,21 +503,14 @@ function App() {
 
   useEffect(() => {
     loadConfig();
-
-    invoke("get_paused").then(setIsPaused);
-
-    // Listen for Tray events
+    invoke("get_paused_cmd").then(setIsPaused);
     import("@tauri-apps/api/event").then(({ listen }) => {
-      listen("pause-status", (event) => {
-        setIsPaused(event.payload);
-      });
+      listen("pause-status", (event) => setIsPaused(event.payload));
     });
-
     invoke("get_startup_status_cmd").then(setAutoStart);
 
     const interval = setInterval(() => {
       invoke("get_touch_status").then(setIsTouched);
-      // invoke("get_paused").then(setIsPaused); // Polling is fallback, event is primary
     }, 500);
     return () => clearInterval(interval);
   }, []);
@@ -510,36 +518,13 @@ function App() {
   const togglePause = () => {
     const newVal = !isPaused;
     setIsPaused(newVal);
-    invoke("set_paused", { paused: newVal });
+    invoke("set_paused_cmd", { paused: newVal });
   };
 
   const toggleAutoStart = (e) => {
     const newVal = e.target.checked;
     setAutoStart(newVal);
     invoke("set_startup_cmd", { enabled: newVal });
-  };
-
-  const saveConfig = async (newMappings, delay, sens, speed, invert, linuxScroll) => {
-    try {
-      const cfg = await invoke("get_config");
-      const updated = {
-        ...cfg,
-        mappings: newMappings || cfg.mappings,
-        release_delay_ms: delay !== null ? parseInt(delay) : cfg.release_delay_ms,
-        scroll_sensitivity: sens !== null ? parseInt(sens) : cfg.scroll_sensitivity,
-        scroll_speed: speed !== null ? parseInt(speed) : cfg.scroll_speed,
-        scroll_invert: invert !== null ? invert : cfg.scroll_invert,
-        linux_min_distance: linuxScroll?.min_distance ?? cfg.linux_min_distance,
-        linux_min_speed: linuxScroll?.min_speed ?? cfg.linux_min_speed,
-        linux_min_scroll_speed: linuxScroll?.min_scroll_speed ?? cfg.linux_min_scroll_speed,
-        linux_max_scroll_speed: linuxScroll?.max_scroll_speed ?? cfg.linux_max_scroll_speed,
-        linux_use_scroll_curve: linuxScroll?.use_curve ?? cfg.linux_use_scroll_curve,
-        linux_scroll_curve: linuxScroll?.curve ?? cfg.linux_scroll_curve,
-      };
-      await invoke("save_config", { config: updated });
-    } catch (err) {
-      console.error("Failed to save config:", err);
-    }
   };
 
   const updateAction = (key, actionType, actionValue) => {
@@ -556,23 +541,21 @@ function App() {
 
     const newMappings = { ...mappings, [key]: { type: actionType, value: finalValue } };
     setMappings(newMappings);
-    saveConfig(newMappings);
+    saveConfigWithLatest({ mappings: newMappings });
   };
 
   const removeMapping = (key) => {
     const newMappings = { ...mappings };
     delete newMappings[key];
     setMappings(newMappings);
-    saveConfig(newMappings);
+    saveConfigWithLatest({ mappings: newMappings });
   };
-
 
   const sortedKeys = useMemo(() => {
     return Object.keys(mappings).sort((keyA, keyB) => {
       const actA = mappings[keyA];
       const actB = mappings[keyB];
       let valA, valB;
-
       if (sortField === "key") {
         valA = keyA || "";
         valB = keyB || "";
@@ -580,7 +563,6 @@ function App() {
         valA = actA?.type || "";
         valB = actB?.type || "";
       }
-
       const multiplier = sortOrder === "asc" ? 1 : -1;
       return valA.localeCompare(valB) * multiplier;
     });
@@ -595,7 +577,6 @@ function App() {
     }
   };
 
-
   useEffect(() => {
     if (!listeningForKey) return;
     const handleKeyDown = (e) => {
@@ -604,7 +585,7 @@ function App() {
       if (!mappings[normKey]) {
         const newMappings = { ...mappings, [normKey]: { type: "MouseClick", value: "Left" } };
         setMappings(newMappings);
-        saveConfig(newMappings);
+        saveConfigWithLatest({ mappings: newMappings });
       }
       setListeningForKey(false);
     };
@@ -618,10 +599,11 @@ function App() {
       {showAbout && (
         <div className="modal-overlay" onClick={() => setShowAbout(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <YatsLogo />
             <h2>About YATS</h2>
             <p><strong>YATS</strong> stands for:</p>
             <p className="yats-full-name">Yet Another Touchpad Shortcut</p>
-            <p className="version-info">Version 1.2.6</p>
+            <p className="version-info">Version 1.2.12</p>
             <button className="btn-close-modal" onClick={() => setShowAbout(false)}>Close</button>
           </div>
         </div>
@@ -630,6 +612,7 @@ function App() {
       {listeningForKey && (
         <div className="modal-overlay">
           <div className="modal-content">
+            <div className="recording-icon">●</div>
             <h2>Recording...</h2>
             <p>Press any key on your keyboard to assign it as a trigger.</p>
             <button className="btn-close-modal" onClick={() => setListeningForKey(false)}>Cancel</button>
@@ -649,221 +632,110 @@ function App() {
         />
       )}
 
-      {showScrollSettings && (
-        <div className="modal-overlay" onClick={() => setShowScrollSettings(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2>Global Scroll Settings</h2>
-            <div className="modal-body" style={{ padding: "20px 0" }}>
-              <div style={{ marginBottom: "20px" }}>
-                <label style={{ display: "block", marginBottom: "8px", fontSize: "0.9rem", color: "#888" }}>
-                  Sensitivity: <span className="value-display" style={{ fontSize: "1.1rem" }}>{scrollSensitivity}</span>%
-                </label>
-                <input
-                  type="range" min="0" max="100" step="1"
-                  style={{ width: "100%", height: "6px", accentColor: "#00d2ff" }}
-                  // v2.7.0: UI uses logarithmic mapping for better control at lower ranges. 
-                  // pos = 100 * log10(val) / 2
-                  value={Math.round(100 * Math.log10(scrollSensitivity) / 2)}
-                  onChange={(e) => {
-                    const pos = parseInt(e.target.value);
-                    // val = 100^(pos/100)
-                    const val = Math.round(Math.pow(100, pos / 100));
-                    setScrollSensitivity(val);
-                    saveConfig(null, null, val);
-                  }}
-                />
-                <p style={{ fontSize: "0.75rem", color: "#555", marginTop: "8px" }}>
-                  * This setting affects ALL scroll shortcuts. Control is finer at lower ranges.
-                </p>
-              </div>
-              <div style={{ marginTop: "20px" }}>
-                <label style={{ display: "block", marginBottom: "8px", fontSize: "0.9rem", color: "#888" }}>
-                  Scroll Speed: <span className="value-display" style={{ fontSize: "1.1rem" }}>{Math.round(scrollSpeed * 2)}</span>%
-                </label>
-                <input
-                  type="range" min="5" max="50" step="1"
-                  style={{ width: "100%", height: "6px", accentColor: "#00d2ff" }}
-                  value={scrollSpeed}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value);
-                    setScrollSpeed(val);
-                    saveConfig(null, null, null, null, val);
-                  }}
-                />
-                <p style={{ fontSize: "0.75rem", color: "#555", marginTop: "8px" }}>
-                  * Controls how fast the page scrolls. Lower = slower, higher = faster.
-                </p>
-              </div>
-              <label className="header-control-item" style={{ fontSize: "1rem", color: "#e0e0e0", cursor: "pointer", marginTop: "16px" }}>
-                <input
-                  type="checkbox"
-                  style={{ width: "18px", height: "18px" }}
-                  checked={scrollInvert}
-                  onChange={(e) => {
-                    const val = e.target.checked;
-                    setScrollInvert(val);
-                    saveConfig(null, null, null, val);
-                  }}
-                />
-                Invert Scroll Direction
-              </label>
-
-              <div style={{ marginTop: "24px", paddingTop: "16px", borderTop: "1px solid #333" }}>
-                <button
-                  className="btn-global-config"
-                  style={{ width: "100%", padding: "10px", fontSize: "0.9rem" }}
-                  onClick={() => setShowLinuxScrollDetail(true)}
-                >
-                  Advanced Linux Tuning...
-                </button>
-              </div>
-            </div>
-            <button className="btn-close-modal" onClick={() => setShowScrollSettings(false)}>Close</button>
-          </div>
-        </div>
-      )}
-
-      {showLinuxScrollDetail && (
-        <div className="modal-overlay" onClick={() => setShowLinuxScrollDetail(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "550px", width: "95%" }}>
-            <h2>Linux Scroll Tuning</h2>
-
-            <div className="mode-selector" style={{ display: "flex", gap: "10px", marginBottom: "20px", justifyContent: "center" }}>
-              <button
-                className={`btn-toggle ${!linuxUseScrollCurve ? 'active' : ''}`}
-                onClick={() => {
-                  setLinuxUseScrollCurve(false);
-                  saveConfig(null, null, null, null, null, { use_curve: false });
-                }}
-              >Linear (Standard)</button>
-              <button
-                className={`btn-toggle ${linuxUseScrollCurve ? 'active' : ''}`}
-                onClick={() => {
-                  setLinuxUseScrollCurve(true);
-                  saveConfig(null, null, null, null, null, { use_curve: true });
-                }}
-              >Curve (Advanced)</button>
-            </div>
-
-            <div className="modal-body" style={{ padding: "0", textAlign: "left" }}>
-              {!linuxUseScrollCurve ? (
-                <>
-                  <div style={{ marginBottom: "16px" }}>
-                    <label className="setting-label">Min Mouse Distance (pixel)</label>
-                    <div className="setting-row">
-                      <input
-                        type="range" min="0" max="100" step="1"
-                        value={linuxMinDistance}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value);
-                          setLinuxMinDistance(val);
-                          saveConfig(null, null, null, null, null, { min_distance: val });
-                        }}
-                      />
-                      <input type="number" value={linuxMinDistance} onChange={(e) => {
-                        const val = parseInt(e.target.value) || 0;
+      {showScrollTuning && (
+        <div className="modal-overlay" onClick={() => setShowScrollTuning(false)}>
+          <div className="modal-content scroll-tuning-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "600px", width: "95%" }}>
+            <h2>Scroll Tuning (Linux)</h2>
+            <div className="modal-body">
+              <div className="tuning-grid">
+                <div className="setting-item">
+                  <label className="setting-label">Min Mouse Distance (px)</label>
+                  <p className="setting-hint">Ignore small movements.</p>
+                  <div className="setting-row">
+                    <input
+                      type="range" min="0" max="100" step="1"
+                      value={linuxMinDistance}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value);
                         setLinuxMinDistance(val);
-                        saveConfig(null, null, null, null, null, { min_distance: val });
-                      }} />
-                    </div>
+                        saveConfigWithLatest({ linuxMinDistance: val });
+                      }}
+                    />
+                    <input type="number" value={linuxMinDistance} onChange={(e) => {
+                      const val = parseInt(e.target.value) || 0;
+                      setLinuxMinDistance(val);
+                      saveConfigWithLatest({ linuxMinDistance: val });
+                    }} />
                   </div>
+                </div>
 
-                  <div style={{ marginBottom: "16px" }}>
-                    <label className="setting-label">Min Mouse Speed (pixel/sec)</label>
-                    <div className="setting-row">
-                      <input
-                        type="range" min="0" max="500" step="5"
-                        value={linuxMinSpeed}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value);
-                          setLinuxMinSpeed(val);
-                          saveConfig(null, null, null, null, null, { min_speed: val });
-                        }}
-                      />
-                      <input type="number" value={linuxMinSpeed} onChange={(e) => {
-                        const val = parseFloat(e.target.value) || 0;
-                        setLinuxMinSpeed(val);
-                        saveConfig(null, null, null, null, null, { min_speed: val });
-                      }} />
-                    </div>
-                  </div>
-
-                  <div style={{ marginBottom: "16px" }}>
-                    <label className="setting-label">Min Scroll Output Speed</label>
-                    <div className="setting-row">
-                      <input
-                        type="range" min="0" max="100" step="1"
-                        value={linuxMinScrollSpeed}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value);
-                          setLinuxMinScrollSpeed(val);
-                          saveConfig(null, null, null, null, null, { min_scroll_speed: val });
-                        }}
-                      />
-                      <input type="number" value={linuxMinScrollSpeed} onChange={(e) => {
-                        const val = parseFloat(e.target.value) || 0;
+                <div className="setting-item">
+                  <label className="setting-label">Min Scroll Output Speed</label>
+                  <p className="setting-hint">Minimum scrolling velocity.</p>
+                  <div className="setting-row">
+                    <input
+                      type="range" min="0" max="100" step="1"
+                      value={linuxMinScrollSpeed}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
                         setLinuxMinScrollSpeed(val);
-                        saveConfig(null, null, null, null, null, { min_scroll_speed: val });
-                      }} />
-                    </div>
+                        saveConfigWithLatest({ linuxMinScrollSpeed: val });
+                      }}
+                    />
+                    <input type="number" value={linuxMinScrollSpeed} onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 0;
+                      setLinuxMinScrollSpeed(val);
+                      saveConfigWithLatest({ linuxMinScrollSpeed: val });
+                    }} />
                   </div>
+                </div>
 
-                  <div style={{ marginBottom: "24px" }}>
-                    <label className="setting-label">Max Scroll Output Speed</label>
-                    <div className="setting-row">
-                      <input
-                        type="range" min="0" max="2000" step="10"
-                        value={linuxMaxScrollSpeed}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value);
-                          setLinuxMaxScrollSpeed(val);
-                          // Sync with Curve's last point
-                          let newCurve = [...linuxScrollCurve];
-                          if (newCurve.length > 0) {
-                            newCurve[newCurve.length - 1][1] = val;
-                            setLinuxScrollCurve(newCurve);
-                          }
-                          saveConfig(null, null, null, null, null, { max_scroll_speed: val, curve: newCurve.length > 0 ? newCurve : null });
-                        }}
-                      />
-                      <input type="number" value={linuxMaxScrollSpeed} onChange={(e) => {
-                        const val = parseFloat(e.target.value) || 0;
+                <div className="setting-item full-width">
+                  <label className="setting-label">Max Scroll Output Speed</label>
+                  <p className="setting-hint">Caps the scroll acceleration (Curve Y-Axis).</p>
+                  <div className="setting-row">
+                    <input
+                      type="range" min="100" max="3000" step="50"
+                      value={linuxMaxScrollSpeed}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
                         setLinuxMaxScrollSpeed(val);
-                        // Sync with Curve's last point
-                        let newCurve = [...linuxScrollCurve];
-                        if (newCurve.length > 0) {
-                          newCurve[newCurve.length - 1][1] = val;
-                          setLinuxScrollCurve(newCurve);
-                        }
-                        saveConfig(null, null, null, null, null, { max_scroll_speed: val, curve: newCurve.length > 0 ? newCurve : null });
-                      }} />
-                    </div>
+                        saveConfigWithLatest({ linuxMaxScrollSpeed: val });
+                      }}
+                    />
+                    <input type="number" value={linuxMaxScrollSpeed} onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 0;
+                      setLinuxMaxScrollSpeed(val);
+                      saveConfigWithLatest({ linuxMaxScrollSpeed: val });
+                    }} />
                   </div>
-                </>
-              ) : (
+                </div>
+              </div>
+
+              <div className="curve-section">
+                <label className="setting-label">Acceleration Curve</label>
                 <div className="curve-editor-container">
-                  <label className="setting-label">Scroll Sensitivity Curve (Input vs Output Speed)</label>
                   <CurveEditor
                     points={linuxScrollCurve}
+                    maxY={linuxMaxScrollSpeed}
                     onChange={(newPoints) => {
                       const sorted = [...newPoints].sort((a, b) => a[0] - b[0]);
                       setLinuxScrollCurve(sorted);
-
-                      // Sync last point with max_scroll_speed
-                      let maxSpeed = linuxMaxScrollSpeed;
-                      if (sorted.length > 0) {
-                        maxSpeed = sorted[sorted.length - 1][1];
-                        setLinuxMaxScrollSpeed(maxSpeed);
-                      }
-
-                      saveConfig(null, null, null, null, null, { curve: sorted, max_scroll_speed: maxSpeed });
+                      saveConfigWithLatest({ linuxScrollCurve: sorted });
                     }}
                   />
-                  <p className="hint-text">Drag points to adjust curve. Click on line to add points. Right click points to remove.</p>
                 </div>
-              )}
+                <p className="hint-text">Drag points to adjust. Click line to add. Right-click to remove.</p>
+              </div>
+
+              <div className="minor-settings">
+                <label className="checkbox-item">
+                  <input
+                    type="checkbox"
+                    checked={scrollInvert}
+                    onChange={(e) => {
+                      const val = e.target.checked;
+                      setScrollInvert(val);
+                      saveConfigWithLatest({ scrollInvert: val });
+                    }}
+                  />
+                  Invert Scroll Direction
+                </label>
+              </div>
             </div>
-            <button className="btn-close-modal" onClick={() => setShowLinuxScrollDetail(false)}>Back</button>
+            <div className="modal-footer">
+              <button className="btn-close-modal" onClick={() => setShowScrollTuning(false)}>Done</button>
+            </div>
           </div>
         </div>
       )}
@@ -887,7 +759,7 @@ function App() {
                   onChange={(e) => {
                     const val = parseInt(e.target.value);
                     setReleaseDelay(val);
-                    saveConfig(null, val);
+                    saveConfigWithLatest({ releaseDelay: val });
                   }}
                 />
               </label>
@@ -946,8 +818,8 @@ function App() {
                           </select>
                         )}
                         {action.type === "MouseScroll" && (
-                          <button className="btn-global-config" onClick={() => setShowScrollSettings(true)}>
-                            Configure Global Scroll...
+                          <button className="btn-global-config" onClick={() => setShowScrollTuning(true)}>
+                            Scroll Tuning...
                           </button>
                         )}
                         {action.type === "KeyMacro" && (

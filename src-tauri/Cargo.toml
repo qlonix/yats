@@ -1,6 +1,6 @@
 [package]
 name = "yats"
-version = "1.2.11"
+version = "1.2.12"
 description = "Yet Another Touchpad Shortcut"
 authors = ["Antigravity"]
 edition = "2021"
@@ -32,6 +32,6 @@ winapi = { version = "0.3", features = ["winuser", "hidpi", "shlobj", "libloader
 winreg = "0.52"
 
 [target.'cfg(unix)'.dependencies]
-evdev = "0.12"
+evdev = { version = "0.12", features = ["uinput"] }
 nix = { version = "0.27", features = ["user"] }
 
