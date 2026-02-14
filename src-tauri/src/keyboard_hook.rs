@@ -198,7 +198,7 @@ impl HookWorker {
                                 // Curve based scaling
                                 let input_speed = (delta / _dt).abs();
                                 let output_speed = interpolate_curve(&_curve, input_speed);
-                                
+
                                 // output_total = output_speed * dt
                                 // Maintain direction
                                 delta.signum() * output_speed * _dt
@@ -304,7 +304,8 @@ impl KeyboardHook {
                                 match action {
                                     Action::MouseScroll(cfg) => {
                                         monitor_inner.consume_y_delta();
-                                        let _ = tx_inner.send(RemapCommand::UpdateScroll(Some(cfg)));
+                                        let _ =
+                                            tx_inner.send(RemapCommand::UpdateScroll(Some(cfg)));
                                     }
                                     _ => {
                                         let _ = tx_inner.send(RemapCommand::Execute(action, true));
@@ -340,7 +341,10 @@ impl KeyboardHook {
                     }
                     Some(event)
                 }) {
-                    crate::audit_log(&format!("[HOOK] rdev::grab error: {:?}. Retrying in 3s...", e));
+                    crate::audit_log(&format!(
+                        "[HOOK] rdev::grab error: {:?}. Retrying in 3s...",
+                        e
+                    ));
                     eprintln!("[HOOK] Error: {:?}. Retrying...", e);
                 }
                 crate::audit_log("[HOOK] Keyboard hook exited, restarting in 3s...");
@@ -365,12 +369,18 @@ impl KeyboardHook {
                             if let Ok(mut device) = evdev::Device::open(&path) {
                                 let caps = device.supported_events();
                                 let name = device.name().unwrap_or("Unknown").to_lowercase();
-                                
+
                                 // Only true keyboards (must have KEY events and some specific keys)
-                                if caps.contains(evdev::EventType::KEY) && !name.contains("touchpad") && !name.contains("mouse") {
+                                if caps.contains(evdev::EventType::KEY)
+                                    && !name.contains("touchpad")
+                                    && !name.contains("mouse")
+                                {
                                     // Grab it!
                                     if device.grab().is_ok() {
-                                        crate::audit_log(&format!("[HOOK] Grabbed keyboard: {}", name));
+                                        crate::audit_log(&format!(
+                                            "[HOOK] Grabbed keyboard: {}",
+                                            name
+                                        ));
                                         devices.push(device);
                                     }
                                 }
@@ -390,77 +400,90 @@ impl KeyboardHook {
                     let tx_inner = tx.clone();
                     let config_inner = Arc::clone(&config_ref);
                     let monitor_inner = Arc::clone(&monitor_ref);
-                    
+
                     threads.push(std::thread::spawn(move || {
                         let mut pressed_keys = std::collections::HashSet::new();
                         loop {
-                            match device.fetch_events() {
-                                Ok(events_iter) => {
-                                    let events: Vec<_> = events_iter.collect();
-                                    for ev in events {
-                                        if ev.event_type() == evdev::EventType::KEY {
-                                            let code = ev.code(); // u16
-                                            let value = ev.value(); // i32: 0, 1, or 2
-                                            
-                                            // Map evdev code to rdev Key
-                                            if let Some(rkey) = evdev_to_rdev_key(code) {
-                                                let is_remap = {
+                            let events = match device.fetch_events() {
+                                Ok(it) => it.collect::<Vec<_>>(),
+                                Err(_) => break,
+                            };
+
+                            for ev in events {
+                                if ev.event_type() == evdev::EventType::KEY {
+                                    let code = ev.code(); // u16
+                                    let value = ev.value(); // i32: 0, 1, or 2
+
+                                    // Map evdev code to rdev Key
+                                    if let Some(rkey) = evdev_to_rdev_key(code) {
+                                        let is_remap = {
+                                            let cfg = config_inner.read().unwrap();
+                                            cfg.mappings.contains_key(&rkey)
+                                        };
+
+                                        let touched = monitor_inner.is_touched();
+                                        let paused = IS_PAUSED.load(Ordering::SeqCst);
+                                        let simulating = IS_SIMULATING.load(Ordering::SeqCst);
+
+                                        if is_remap && touched && !paused && !simulating {
+                                            if value == 1 {
+                                                // Press
+                                                pressed_keys.insert(rkey);
+                                                let action = {
                                                     let cfg = config_inner.read().unwrap();
-                                                    cfg.mappings.contains_key(&rkey)
+                                                    cfg.mappings.get(&rkey).cloned()
                                                 };
-
-                                                let touched = monitor_inner.is_touched();
-                                                let paused = IS_PAUSED.load(Ordering::SeqCst);
-                                                let simulating = IS_SIMULATING.load(Ordering::SeqCst);
-
-                                                if is_remap && touched && !paused && !simulating {
-                                                    if value == 1 {
-                                                        // Press
-                                                        pressed_keys.insert(rkey);
-                                                        let action = {
-                                                            let cfg = config_inner.read().unwrap();
-                                                            cfg.mappings.get(&rkey).cloned()
-                                                        };
-                                                        if let Some(action) = action {
-                                                            match action {
-                                                                Action::MouseScroll(cfg) => {
-                                                                    monitor_inner.consume_y_delta();
-                                                                    let _ = tx_inner.send(RemapCommand::UpdateScroll(Some(cfg)));
-                                                                }
-                                                                _ => {
-                                                                    let _ = tx_inner.send(RemapCommand::Execute(action, true));
-                                                                }
-                                                            }
+                                                if let Some(action) = action {
+                                                    match action {
+                                                        Action::MouseScroll(cfg) => {
+                                                            monitor_inner.consume_y_delta();
+                                                            let _ = tx_inner.send(
+                                                                RemapCommand::UpdateScroll(Some(
+                                                                    cfg,
+                                                                )),
+                                                            );
                                                         }
-                                                    } else if value == 0 {
-                                                        // Release
-                                                        if pressed_keys.remove(&rkey) {
-                                                            let action = {
-                                                                let cfg = config_inner.read().unwrap();
-                                                                cfg.mappings.get(&rkey).cloned()
-                                                            };
-                                                            if let Some(action) = action {
-                                                                match action {
-                                                                    Action::MouseScroll(_) => {
-                                                                        let _ = tx_inner.send(RemapCommand::UpdateScroll(None));
-                                                                    }
-                                                                    _ => {
-                                                                        let _ = tx_inner.send(RemapCommand::Execute(action, false));
-                                                                    }
-                                                                }
+                                                        _ => {
+                                                            let _ = tx_inner.send(
+                                                                RemapCommand::Execute(action, true),
+                                                            );
+                                                        }
+                                                    }
+                                                }
+                                            } else if value == 0 {
+                                                // Release
+                                                if pressed_keys.remove(&rkey) {
+                                                    let action = {
+                                                        let cfg = config_inner.read().unwrap();
+                                                        cfg.mappings.get(&rkey).cloned()
+                                                    };
+                                                    if let Some(action) = action {
+                                                        match action {
+                                                            Action::MouseScroll(_) => {
+                                                                let _ = tx_inner.send(
+                                                                    RemapCommand::UpdateScroll(
+                                                                        None,
+                                                                    ),
+                                                                );
+                                                            }
+                                                            _ => {
+                                                                let _ = tx_inner.send(
+                                                                    RemapCommand::Execute(
+                                                                        action, false,
+                                                                    ),
+                                                                );
                                                             }
                                                         }
                                                     }
-                                                    // Consume event (do not pass through)
-                                                    continue;
                                                 }
                                             }
+                                            // Consume event (do not pass through)
+                                            continue;
                                         }
-                                        // Pass through
-                                        let _ = device.send_events(&[ev]);
                                     }
                                 }
-                                Err(_) => break, // Device lost
+                                // Pass through
+                                let _ = device.send_events(&[ev]);
                             }
                         }
                     }));
