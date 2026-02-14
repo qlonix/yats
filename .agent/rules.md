@@ -21,4 +21,5 @@
 - **GitHubのReleasesは指示があるまで追加/変更しない。**
 - **GitHubのReleasesのAssetsへの追加・アップデートは指示があるまで行わない。**
 - **Windows 版のビルドはローカルだけで行う。GitHub Actions でのビルドは禁止する。**
+- **ビルド成果物（Windows, Linux 共に）は、ビルドの都度 `Z:\devel\Antigravity\yats\[バージョン番号]` フォルダにコピーして保管する。**
 - **変更履歴を `CHANGELOG.md` に記載していく。**
