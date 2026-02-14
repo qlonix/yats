@@ -5,11 +5,17 @@ All notable changes to YATS (Yet Another Touchpad Shortcut) will be documented i
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.2.13] - 2026-02-14
+## [1.2.14] - 2026-02-14
 
 ### Fixed
+- **Linux ビルドエラーの改善 (再修正)**: `evdev::Key` 列挙型の不適切な構築方法を修正し、物理デバイスから動的にキー構成をコピーするように変更。これによりコンパイルエラーを解消。
 - **Linux ビルドエラーの改善**: `Cargo.toml` から非推奨の `uinput` フィーチャー指定を削除し、`keyboard_hook.rs` の構文エラーを修正。これにより GitHub Actions でのビルドが不安定だった問題を解消。
+
+## [1.2.13] - 2026-02-14 [YANKED]
+
+### Fixed
 - **設定保存の正確性向上**: 設定保存時の競合（Race Condition）を解消し、スクロール詳細設定が確実に保存されるように修正。
+- **注意**: このバージョンはビルドエラーのため使用できません。v1.2.14 を使用してください。
 
 ## [1.2.12] - 2026-02-14 [YANKED]
 

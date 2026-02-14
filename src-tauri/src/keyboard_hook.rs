@@ -405,11 +405,14 @@ impl KeyboardHook {
                     })
                     .name("YATS Virtual Keyboard");
 
-                // Copy capabilities from the first device (or just add all common keyboard events)
-                // To be safe, we just enable all keys that we might ever want to forward.
+                // Copy capabilities from all grabbed devices
                 let mut keys = evdev::AttributeSet::<evdev::Key>::default();
-                for i in 0..0x2ff {
-                    keys.insert(evdev::Key(i as u16));
+                for d in &devices {
+                    if let Some(set) = d.supported_keys() {
+                        for k in set.iter() {
+                            keys.insert(k);
+                        }
+                    }
                 }
 
                 uinput_builder = uinput_builder.with_keys(&keys);

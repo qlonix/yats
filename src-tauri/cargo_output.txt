@@ -1,0 +1,52 @@
+   Compiling quote v1.0.44
+    Checking pin-project-lite v0.2.16
+    Checking futures-core v0.3.31
+    Checking memchr v2.7.6
+    Checking once_cell v1.21.3
+    Checking smallvec v1.15.1
+    Checking slab v0.4.12
+   Compiling proc-macro2 v1.0.106
+   Compiling serde_core v1.0.228
+   Compiling serde v1.0.228
+   Compiling indexmap v2.13.0
+   Compiling target-lexicon v0.12.16
+   Compiling libc v0.2.180
+   Compiling syn v1.0.109
+   Compiling zerocopy v0.8.37
+   Compiling proc-macro-error-attr v1.0.4
+   Compiling proc-macro-error v1.0.4
+   Compiling thiserror v1.0.69
+    Checking futures-io v0.3.31
+   Compiling parking_lot_core v0.9.12
+   Compiling getrandom v0.1.16
+   Compiling thiserror v2.0.18
+   Compiling typeid v1.0.3
+    Checking pin-utils v0.1.0
+   Compiling rand_core v0.6.4
+   Compiling toml_parser v1.0.6+spec-1.1.0
+    Checking futures-task v0.3.31
+   Compiling ident_case v1.0.1
+   Compiling erased-serde v0.4.9
+   Compiling heck v0.4.1
+   Compiling strsim v0.11.1
+error[E0463]: can't find crate for `core`
+  |
+  = note: the `x86_64-unknown-linux-gnu` target may not be installed
+  = help: consider downloading the target with `rustup target add x86_64-unknown-linux-gnu`
+
+For more information about this error, try `rustc --explain E0463`.
+error[E0463]: can't find crate for `std`
+  |
+  = note: the `x86_64-unknown-linux-gnu` target may not be installed
+  = help: consider downloading the target with `rustup target add x86_64-unknown-linux-gnu`
+
+error: could not compile `futures-core` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `pin-project-lite` (lib) due to 1 previous error
+error: could not compile `once_cell` (lib) due to 1 previous error
+error: could not compile `smallvec` (lib) due to 1 previous error
+error: could not compile `slab` (lib) due to 1 previous error
+error: could not compile `memchr` (lib) due to 1 previous error
+error: could not compile `futures-io` (lib) due to 1 previous error
+error: could not compile `pin-utils` (lib) due to 1 previous error
+error: could not compile `futures-task` (lib) due to 1 previous error
