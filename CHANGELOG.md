@@ -5,6 +5,15 @@ All notable changes to YATS (Yet Another Touchpad Shortcut) will be documented i
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.5] - 2026-02-14
+
+### Fixed
+- **スクロール速度反映の修正**: 計算ロジック内の不要な係数を削除し、カーブエディタで設定した出力速度が正確に反映されるように修正。
+
+### Changed
+- **感度曲線の平滑化**: カーブエディタの補間アルゴリズムを線形からスプライン曲線（Monotone Cubic Spline）に変更。つなぎ目がなだらかになり、より直感的なチューニングが可能。
+- **UIのブラッシュアップ**: グラフの描画品質向上、目盛りラベルの追加、グリッドの調整。
+
 ## [1.2.4] - 2026-02-14
 
 ### Added

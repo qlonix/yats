@@ -237,9 +237,9 @@ const YatsLogo = () => (
 const CurveEditor = ({ points, onChange }) => {
   const [draggingIdx, setDraggingIdx] = useState(null);
   const svgRef = useRef(null);
-  const width = 400;
-  const height = 250;
-  const margin = 30;
+  const width = 450;
+  const height = 280;
+  const margin = 35;
 
   // Max values for scale
   const maxX = 2000;
@@ -252,6 +252,63 @@ const CurveEditor = ({ points, onChange }) => {
 
   const sortedPoints = [...points].sort((a, b) => a[0] - b[0]);
 
+  // Monotone Cubic Spline implementation for preview
+  const getSplinePoints = () => {
+    const n = sortedPoints.length;
+    if (n < 2) return [];
+
+    const x = sortedPoints.map(p => p[0]);
+    const y = sortedPoints.map(p => p[1]);
+
+    // Secants
+    const d = [];
+    for (let i = 0; i < n - 1; i++) {
+      d.push((y[i + 1] - y[i]) / (x[i + 1] - x[i]));
+    }
+
+    // Slopes
+    const m = new Array(n).fill(0);
+    m[0] = d[0];
+    for (let i = 1; i < n - 1; i++) {
+      m[i] = (d[i - 1] + d[i]) / 2;
+    }
+    m[n - 1] = d[n - 2];
+
+    // Monotonicity adjustment
+    for (let i = 0; i < n - 1; i++) {
+      if (d[i] === 0) {
+        m[i] = 0;
+        m[i + 1] = 0;
+      } else {
+        const a = m[i] / d[i];
+        const b = m[i + 1] / d[i];
+        const h = Math.hypot(a, b);
+        if (h > 3) {
+          const t = 3 / h;
+          m[i] = t * a * d[i];
+          m[i + 1] = t * b * d[i];
+        }
+      }
+    }
+
+    // Interpolation for path
+    const pathPoints = [];
+    const steps = 100;
+    for (let i = 0; i < n - 1; i++) {
+      const h = x[i + 1] - x[i];
+      for (let j = 0; j <= steps; j++) {
+        const stepX = x[i] + (h * j) / steps;
+        const t = (stepX - x[i]) / h;
+        const val = y[i] * (1 + 2 * t) * (1 - t) ** 2
+          + h * m[i] * t * (1 - t) ** 2
+          + y[i + 1] * t ** 2 * (3 - 2 * t)
+          + h * m[i + 1] * t ** 2 * (t - 1);
+        pathPoints.push([stepX, val]);
+      }
+    }
+    return pathPoints;
+  };
+
   const handleMouseDown = (e, idx) => {
     e.stopPropagation();
     if (idx !== null) {
@@ -262,17 +319,21 @@ const CurveEditor = ({ points, onChange }) => {
   const handleMouseMove = (e) => {
     if (draggingIdx === null) return;
     const rect = svgRef.current.getBoundingClientRect();
-    const x = fromSvgX(e.clientX - rect.left);
-    const y = fromSvgY(e.clientY - rect.top);
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+
+    let x = fromSvgX(sx);
+    let y = fromSvgY(sy);
 
     const newPoints = [...sortedPoints];
-    // Clamp values
-    const clampedX = Math.max(0, Math.min(maxX, x));
-    const clampedY = Math.max(0, Math.min(maxY, y));
+    x = Math.max(0, Math.min(maxX, x));
+    y = Math.max(0, Math.min(maxY, y));
 
-    // First and last points should stay at edges of X axis if possible, 
-    // but here we allow movement
-    newPoints[draggingIdx] = [clampedX, clampedY];
+    // Constraint: don't cross neighbors
+    if (draggingIdx > 0) x = Math.max(newPoints[draggingIdx - 1][0] + 1, x);
+    if (draggingIdx < n - 1) x = Math.min(newPoints[draggingIdx + 1][0] - 1, x);
+
+    newPoints[draggingIdx] = [x, y];
     onChange(newPoints);
   };
 
@@ -285,8 +346,7 @@ const CurveEditor = ({ points, onChange }) => {
     const x = fromSvgX(e.clientX - rect.left);
     const y = fromSvgY(e.clientY - rect.top);
 
-    // Don't add if clicking near existing point
-    if (sortedPoints.some(p => Math.abs(toSvgX(p[0]) - (e.clientX - rect.left)) < 10)) return;
+    if (sortedPoints.some(p => Math.abs(toSvgX(p[0]) - (e.clientX - rect.left)) < 15)) return;
 
     const newPoints = [...sortedPoints, [x, y]];
     onChange(newPoints);
@@ -300,10 +360,13 @@ const CurveEditor = ({ points, onChange }) => {
     }
   };
 
-  const pathData = sortedPoints.length > 0
-    ? `M ${toSvgX(sortedPoints[0][0])} ${toSvgY(sortedPoints[0][1])} ` +
-    sortedPoints.slice(1).map(p => `L ${toSvgX(p[0])} ${toSvgY(p[1])}`).join(' ')
+  const splineData = getSplinePoints();
+  const pathData = splineData.length > 0
+    ? `M ${toSvgX(splineData[0][0])} ${toSvgY(splineData[0][1])} ` +
+    splineData.slice(1).map(p => `L ${toSvgX(p[0])} ${toSvgY(p[1])}`).join(' ')
     : "";
+
+  const n = sortedPoints.length;
 
   return (
     <div className="curve-editor-wrapper" onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
@@ -318,17 +381,19 @@ const CurveEditor = ({ points, onChange }) => {
         {/* Grid lines */}
         {[0, 0.25, 0.5, 0.75, 1].map(v => (
           <g key={v}>
-            <line x1={margin} y1={toSvgY(v * maxY)} x2={width - margin} y2={toSvgY(v * maxY)} stroke="#333" strokeDasharray="4" />
-            <line x1={toSvgX(v * maxX)} y1={margin} x2={toSvgX(v * maxX)} y2={height - margin} stroke="#333" strokeDasharray="4" />
+            <line x1={margin} y1={toSvgY(v * maxY)} x2={width - margin} y2={toSvgY(v * maxY)} stroke="#222" strokeWidth="1" />
+            <line x1={toSvgX(v * maxX)} y1={margin} x2={toSvgX(v * maxX)} y2={height - margin} stroke="#222" strokeWidth="1" />
+            <text x={margin - 5} y={toSvgY(v * maxY)} fill="#444" fontSize="9" textAnchor="end" alignmentBaseline="middle">{Math.round(v * maxY)}</text>
+            <text x={toSvgX(v * maxX)} y={height - margin + 15} fill="#444" fontSize="9" textAnchor="middle">{Math.round(v * maxX)}</text>
           </g>
         ))}
 
         {/* Labels */}
-        <text x={width / 2} y={height - 5} fill="#666" fontSize="10" textAnchor="middle">Input Speed (pixels/sec)</text>
-        <text x={5} y={height / 2} fill="#666" fontSize="10" transform={`rotate(-90, 5, ${height / 2})`} textAnchor="middle">Output Speed</text>
+        <text x={width / 2} y={height - 5} fill="#666" fontSize="10" textAnchor="middle">Input Mouse Speed (pixels/sec)</text>
+        <text x={10} y={height / 2} fill="#666" fontSize="10" transform={`rotate(-90, 10, ${height / 2})`} textAnchor="middle">Output Scroll Speed</text>
 
         {/* Curve Path */}
-        <path d={pathData} fill="none" stroke="#00d2ff" strokeWidth="3" />
+        <path d={pathData} fill="none" stroke="#00d2ff" strokeWidth="2.5" strokeLinejoin="round" />
 
         {/* Points */}
         {sortedPoints.map((p, i) => (
@@ -336,11 +401,13 @@ const CurveEditor = ({ points, onChange }) => {
             key={i}
             cx={toSvgX(p[0])}
             cy={toSvgY(p[1])}
-            r={draggingIdx === i ? 6 : 4}
+            r={draggingIdx === i ? 7 : 5}
             fill={draggingIdx === i ? "#fff" : "#00d2ff"}
+            stroke={draggingIdx === i ? "#00d2ff" : "none"}
+            strokeWidth="2"
             onMouseDown={(e) => handleMouseDown(e, i)}
             onContextMenu={(e) => handleContextMenu(e, i)}
-            style={{ cursor: "pointer" }}
+            style={{ cursor: "pointer", transition: "r 0.1s" }}
           />
         ))}
       </svg>

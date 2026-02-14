@@ -201,14 +201,9 @@ impl HookWorker {
                                 let input_speed = (delta / _dt).abs();
                                 let output_speed = interpolate_curve(&_curve, input_speed);
 
-                                // output_total = delta * (output_speed / input_speed)
-                                // But to avoid div by zero and maintain direction:
-                                if input_speed > 0.1 {
-                                    let factor = output_speed / input_speed;
-                                    addition = delta * factor * 0.04; // 0.04 approx scale for Linux
-                                } else {
-                                    addition = 0.0;
-                                }
+                                // output_total = output_speed * dt
+                                // Maintain direction
+                                addition = delta.signum() * output_speed * _dt;
                             } else {
                                 // Linear based scaling (existing logic)
                                 let current_out_speed = addition.abs() / 0.008;
@@ -356,20 +351,67 @@ fn interpolate_curve(curve: &[(f32, f32)], input: f32) -> f32 {
     if curve.is_empty() {
         return input;
     }
-    if input <= curve[0].0 {
+    if curve.len() == 1 {
         return curve[0].1;
     }
-    if input >= curve[curve.len() - 1].0 {
-        return curve[curve.len() - 1].1;
+
+    // Monotone Cubic Spline (Fritsch-Carlson)
+    let n = curve.len();
+    let mut x = Vec::with_capacity(n);
+    let mut y = Vec::with_capacity(n);
+    for p in curve {
+        x.push(p.0);
+        y.push(p.1);
     }
 
-    for i in 0..curve.len() - 1 {
-        let (x0, y0) = curve[i];
-        let (x1, y1) = curve[i + 1];
-        if input >= x0 && input <= x1 {
-            let t = (input - x0) / (x1 - x0);
-            return y0 + t * (y1 - y0);
+    if input <= x[0] {
+        return y[0];
+    }
+    if input >= x[n - 1] {
+        return y[n - 1];
+    }
+
+    // Secants and slopes
+    let mut d = Vec::with_capacity(n - 1);
+    for i in 0..n - 1 {
+        d.push((y[i + 1] - y[i]) / (x[i + 1] - x[i]));
+    }
+
+    let mut m = vec![0.0; n];
+    m[0] = d[0];
+    for i in 1..n - 1 {
+        m[i] = (d[i - 1] + d[i]) / 2.0;
+    }
+    m[n - 1] = d[n - 2];
+
+    // Monotonicity adjustment
+    for i in 0..n - 1 {
+        if d[i] == 0.0 {
+            m[i] = 0.0;
+            m[i + 1] = 0.0;
+        } else {
+            let a = m[i] / d[i];
+            let b = m[i + 1] / d[i];
+            let h = (a * a + b * b).sqrt();
+            if h > 3.0 {
+                let t = 3.0 / h;
+                m[i] = t * a * d[i];
+                m[i + 1] = t * b * d[i];
+            }
         }
     }
-    input
+
+    // Interpolation
+    for i in 0..n - 1 {
+        if input >= x[i] && input <= x[i + 1] {
+            let h = x[i + 1] - x[i];
+            let t = (input - x[i]) / h;
+            return y[i] * (1.0 + 2.0 * t) * (1.0 - t).powi(2)
+                + h * m[i] * t * (1.0 - t).powi(2)
+                + y[i + 1] * t.powi(2) * (3.0 - 2.0 * t)
+                + h * m[i + 1] * t.powi(2) * (t - 1.0);
+        }
+    }
+
+    y[n - 1]
 }
