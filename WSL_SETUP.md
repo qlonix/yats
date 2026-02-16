@@ -6,6 +6,21 @@ This guide describes how to set up a Linux build environment for YATS directly i
 
 - WSL2 installed (with Ubuntu 22.04 recommended)
 
+## GLIBC compatibility note
+
+If your target Linux distribution is older (e.g., Ubuntu 22.04 or older), you must build on a compatible environment.
+The default `Ubuntu` in WSL is typically version 24.04, which links against a newer GLIBC (2.39). Binaries built there will not run on older systems (like Ubuntu 20.04/22.04).
+
+**Recommendation:** Install and use `Ubuntu-22.04` in WSL.
+
+```bash
+# Install Ubuntu 22.04
+wsl --install -d Ubuntu-22.04
+
+# Run build in this specific distro
+wsl -d Ubuntu-22.04
+```
+
 ## Setup Steps
 
 Open your WSL terminal and run the following commands:
@@ -47,7 +62,7 @@ source $HOME/.cargo/env
 
 1. Navigate to the project directory in WSL:
    ```bash
-   cd /mnt/c/Users/u/OneDrive/devel/Antigravity/Projects/yats
+   cd /path/to/yats
    ```
 2. Install dependencies:
    ```bash

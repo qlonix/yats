@@ -8,6 +8,8 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 body {
@@ -768,6 +770,8 @@ select option:checked {
   background: linear-gradient(135deg, #1e2227 0%, #161a1e 100%);
   border: 1px solid rgba(0, 210, 255, 0.2);
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 .scroll-tuning-modal h2 {

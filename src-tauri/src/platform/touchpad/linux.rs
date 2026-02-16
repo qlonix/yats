@@ -133,7 +133,8 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                     // Handle ABSOLUTE axis events
                     if ev.event_type() == EventType::ABSOLUTE {
                         const JUMP_THRESHOLD: i32 = 100;
-                        const ACCUM_THRESHOLD: i32 = 8;
+                        // タッチパッド移動の最小検出閾値（1=即座に反応）
+                        const ACCUM_THRESHOLD: i32 = 1;
 
                         match ev.code() {
                             0 => {

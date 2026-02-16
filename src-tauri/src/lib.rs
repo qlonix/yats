@@ -16,14 +16,14 @@ use std::sync::atomic::Ordering;
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use tauri::{
-    menu::{CheckMenuItem, Menu, MenuItem},
+    menu::{Menu, MenuItem},
     tray::{MouseButton, TrayIconBuilder, TrayIconEvent},
     Emitter, Manager,
 };
 
 static LOG_PATH: OnceLock<PathBuf> = OnceLock::new();
 static LOG_TX: OnceLock<Sender<String>> = OnceLock::new();
-static PAUSE_MENU_ITEM: OnceLock<CheckMenuItem<tauri::Wry>> = OnceLock::new();
+static PAUSE_MENU_ITEM: OnceLock<MenuItem<tauri::Wry>> = OnceLock::new();
 
 pub fn audit_log(msg: &str) {
     if let Some(tx) = LOG_TX.get() {
@@ -137,7 +137,12 @@ fn get_paused_cmd() -> bool {
 fn set_paused_cmd(app: tauri::AppHandle, paused: bool) {
     IS_PAUSED.store(paused, Ordering::SeqCst);
     if let Some(item) = PAUSE_MENU_ITEM.get() {
-        let _ = item.set_checked(paused);
+        let label = if paused {
+            "▶ 機能を再開"
+        } else {
+            "⏸ 一時停止"
+        };
+        let _ = item.set_text(label);
     }
     let _ = app.emit("pause-status", paused).ok();
     audit_log(&format!("[SYSTEM] Pause state changed to: {}", paused));
@@ -387,8 +392,7 @@ pub fn run() {
 
             let quit_i = MenuItem::with_id(app, "quit", "終了", true, None::<&str>)?;
             let settings_i = MenuItem::with_id(app, "settings", "設定", true, None::<&str>)?;
-            let pause_i =
-                CheckMenuItem::with_id(app, "pause", "機能の一時停止", true, false, None::<&str>)?;
+            let pause_i = MenuItem::with_id(app, "pause", "⏸ 一時停止", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&settings_i, &pause_i, &quit_i])?;
 
             let _ = PAUSE_MENU_ITEM.set(pause_i.clone());
@@ -407,12 +411,17 @@ pub fn run() {
                         }
                     }
                     "pause" => {
-                        let is_checked = IS_PAUSED.load(Ordering::SeqCst);
-                        let new_state = !is_checked;
+                        let is_paused = IS_PAUSED.load(Ordering::SeqCst);
+                        let new_state = !is_paused;
                         IS_PAUSED.store(new_state, Ordering::SeqCst);
 
                         if let Some(item) = PAUSE_MENU_ITEM.get() {
-                            let _ = item.set_checked(new_state);
+                            let label = if new_state {
+                                "▶ 機能を再開"
+                            } else {
+                                "⏸ 一時停止"
+                            };
+                            let _ = item.set_text(label);
                         }
 
                         let _ = app.emit("pause-status", new_state).ok();

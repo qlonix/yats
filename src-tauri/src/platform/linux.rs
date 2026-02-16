@@ -42,18 +42,13 @@ impl super::InputSimulation for LinuxPlatform {
 
     fn send_mouse_scroll(delta: i32) {
         use rdev::{simulate, EventType};
-        use std::sync::atomic::{AtomicI32, Ordering};
-        static ACCUMULATOR: AtomicI32 = AtomicI32::new(0);
 
-        // 蓄積して 40 (LINEAR_SCALE) に達したら送信する
-        let total = ACCUMULATOR.fetch_add(delta, Ordering::SeqCst) + delta;
-        let scaled_delta = total / 40;
-
-        if scaled_delta != 0 {
-            ACCUMULATOR.fetch_sub(scaled_delta * 40, Ordering::SeqCst);
+        // keyboard_hook 側の accumulator で既にスケーリング済み
+        // ここでは受け取った delta をそのまま Wheel イベントとして送信する
+        if delta != 0 {
             let _ = simulate(&EventType::Wheel {
                 delta_x: 0,
-                delta_y: scaled_delta as i64,
+                delta_y: delta as i64,
             });
         }
     }

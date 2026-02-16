@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import LegacyScrollSettings from "./LegacyScrollSettings";
 import "./App.css";
 
 const normalizeKey = (e) => {
@@ -437,11 +438,17 @@ function App() {
   const [autoStart, setAutoStart] = useState(false);
   const [recordingMacroKey, setRecordingMacroKey] = useState(null);
   const [showScrollTuning, setShowScrollTuning] = useState(false);
-  const [scrollInvert, setScrollInvert] = useState(false);
+  const [scrollInvert, setScrollInvert] = useState(true);
+  const [scrollSensitivity, setScrollSensitivity] = useState(1);
+  const [scrollSpeed, setScrollSpeed] = useState(5);
   const [linuxMinDistance, setLinuxMinDistance] = useState(0);
-  const [linuxMinScrollSpeed, setLinuxMinScrollSpeed] = useState(0);
-  const [linuxMaxScrollSpeed, setLinuxMaxScrollSpeed] = useState(800);
-  const [linuxScrollCurve, setLinuxScrollCurve] = useState([]);
+  const [linuxMinSpeed, setLinuxMinSpeed] = useState(0.0);
+  const [linuxMinScrollSpeed, setLinuxMinScrollSpeed] = useState(1);
+  const [linuxMaxScrollSpeed, setLinuxMaxScrollSpeed] = useState(100);
+  const [linuxScrollCurve, setLinuxScrollCurve] = useState([
+    [0, 1.6335227], [1305, 3.90625], [1730, 21.448864], [2000, 79.360794]
+  ]);
+  const [showLegacySettings, setShowLegacySettings] = useState(false);
 
   // Centralized robust save function
   const saveConfigWithLatest = async (overrides = {}) => {
@@ -451,11 +458,11 @@ function App() {
       const updated = {
         mappings: overrides.mappings !== undefined ? overrides.mappings : mappings,
         release_delay_ms: overrides.releaseDelay !== undefined ? parseInt(overrides.releaseDelay) : releaseDelay,
-        scroll_sensitivity: 200, // Fixed as per user request
-        scroll_speed: 50, // Fixed as per user request
+        scroll_sensitivity: overrides.scrollSensitivity !== undefined ? parseInt(overrides.scrollSensitivity) : scrollSensitivity,
+        scroll_speed: overrides.scrollSpeed !== undefined ? parseInt(overrides.scrollSpeed) : scrollSpeed,
         scroll_invert: overrides.scrollInvert !== undefined ? overrides.scrollInvert : scrollInvert,
         linux_min_distance: overrides.linuxMinDistance !== undefined ? overrides.linuxMinDistance : linuxMinDistance,
-        linux_min_speed: 0.0, // Fixed as per user request
+        linux_min_speed: overrides.linuxMinSpeed !== undefined ? parseFloat(overrides.linuxMinSpeed) : linuxMinSpeed,
         linux_min_scroll_speed: overrides.linuxMinScrollSpeed !== undefined ? overrides.linuxMinScrollSpeed : linuxMinScrollSpeed,
         linux_max_scroll_speed: overrides.linuxMaxScrollSpeed !== undefined ? overrides.linuxMaxScrollSpeed : linuxMaxScrollSpeed,
         linux_use_scroll_curve: true, // Fixed as baseline
@@ -489,12 +496,15 @@ function App() {
       });
       setMappings(normalized);
       setReleaseDelay(config.release_delay_ms || 200);
-      setScrollInvert(config.scroll_invert || false);
-      setLinuxMinDistance(config.linux_min_distance || 0);
-      setLinuxMinScrollSpeed(config.linux_min_scroll_speed ?? 0);
-      setLinuxMaxScrollSpeed(config.linux_max_scroll_speed ?? 800);
+      setScrollSensitivity(config.scroll_sensitivity ?? 1);
+      setScrollSpeed(config.scroll_speed ?? 5);
+      setScrollInvert(config.scroll_invert ?? true);
+      setLinuxMinDistance(config.linux_min_distance ?? 0);
+      setLinuxMinSpeed(config.linux_min_speed ?? 0.0);
+      setLinuxMinScrollSpeed(config.linux_min_scroll_speed ?? 1);
+      setLinuxMaxScrollSpeed(config.linux_max_scroll_speed ?? 100);
       setLinuxScrollCurve(config.linux_scroll_curve && config.linux_scroll_curve.length > 0 ? config.linux_scroll_curve : [
-        [0, 0], [500, 500], [1000, 1000], [2000, 2000]
+        [0, 1.6335227], [1305, 3.90625], [1730, 21.448864], [2000, 79.360794]
       ]);
     } catch (err) {
       console.error("Failed to load config:", err);
@@ -632,11 +642,43 @@ function App() {
         />
       )}
 
+      <LegacyScrollSettings
+        visible={showLegacySettings}
+        onClose={() => setShowLegacySettings(false)}
+        scrollSensitivity={scrollSensitivity}
+        setScrollSensitivity={setScrollSensitivity}
+        scrollSpeed={scrollSpeed}
+        setScrollSpeed={setScrollSpeed}
+        scrollInvert={scrollInvert}
+        setScrollInvert={setScrollInvert}
+        linuxMinSpeed={linuxMinSpeed}
+        setLinuxMinSpeed={setLinuxMinSpeed}
+        linuxMinDistance={linuxMinDistance}
+        linuxMinScrollSpeed={linuxMinScrollSpeed}
+        linuxMaxScrollSpeed={linuxMaxScrollSpeed}
+        linuxScrollCurve={linuxScrollCurve}
+        saveConfigWithLatest={saveConfigWithLatest}
+      />
+
       {showScrollTuning && (
         <div className="modal-overlay" onClick={() => setShowScrollTuning(false)}>
           <div className="modal-content scroll-tuning-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "600px", width: "95%" }}>
             <h2>Scroll Tuning (Linux)</h2>
             <div className="modal-body">
+              <div className="minor-settings" style={{ marginBottom: "16px" }}>
+                <label className="checkbox-item">
+                  <input
+                    type="checkbox"
+                    checked={!scrollInvert}
+                    onChange={(e) => {
+                      const val = !e.target.checked;
+                      setScrollInvert(val);
+                      saveConfigWithLatest({ scrollInvert: val });
+                    }}
+                  />
+                  Natural Scroll Direction
+                </label>
+              </div>
               <div className="tuning-grid">
                 <div className="setting-item">
                   <label className="setting-label">Min Mouse Distance (px)</label>
@@ -687,7 +729,7 @@ function App() {
                   <p className="setting-hint">Caps the scroll acceleration (Curve Y-Axis).</p>
                   <div className="setting-row">
                     <input
-                      type="range" min="100" max="3000" step="50"
+                      type="range" min="10" max="200" step="1"
                       value={linuxMaxScrollSpeed}
                       onChange={(e) => {
                         const val = parseFloat(e.target.value);
@@ -698,9 +740,10 @@ function App() {
                         saveConfigWithLatest({ linuxMaxScrollSpeed: val, linuxScrollCurve: clamped });
                       }}
                     />
-                    <input type="number" min="100" value={linuxMaxScrollSpeed} onChange={(e) => {
+                    <input type="number" min="10" max="200" value={linuxMaxScrollSpeed} onChange={(e) => {
                       let val = parseFloat(e.target.value);
-                      if (isNaN(val) || val < 100) val = 100;
+                      if (isNaN(val) || val < 10) val = 10;
+                      if (val > 200) val = 200;
                       setLinuxMaxScrollSpeed(val);
                       const clamped = linuxScrollCurve.map(p => [p[0], Math.min(p[1], val)]);
                       setLinuxScrollCurve(clamped);
@@ -726,20 +769,7 @@ function App() {
                 <p className="hint-text">Drag points to adjust. Click line to add. Right-click to remove.</p>
               </div>
 
-              <div className="minor-settings">
-                <label className="checkbox-item">
-                  <input
-                    type="checkbox"
-                    checked={scrollInvert}
-                    onChange={(e) => {
-                      const val = e.target.checked;
-                      setScrollInvert(val);
-                      saveConfigWithLatest({ scrollInvert: val });
-                    }}
-                  />
-                  Invert Scroll Direction
-                </label>
-              </div>
+
             </div>
             <div className="modal-footer">
               <button className="btn-close-modal" onClick={() => setShowScrollTuning(false)}>Done</button>
@@ -772,6 +802,17 @@ function App() {
                 />
               </label>
             </div>
+            {/* Advanced Settings ボタンは非表示（コードは残しておく）
+            <div style={{ marginTop: "10px", textAlign: "right" }}>
+              <button
+                className="btn-global-config"
+                style={{ fontSize: "0.8rem", padding: "4px 8px" }}
+                onClick={() => setShowLegacySettings(true)}
+              >
+                Advanced Settings...
+              </button>
+            </div>
+            */}
           </div>
         </div>
         <div className="status-container">

@@ -65,11 +65,11 @@ pub struct AppConfig {
 }
 
 fn default_sensitivity() -> u32 {
-    100
+    1
 }
 
 fn default_scroll_speed() -> u32 {
-    50
+    5
 }
 
 fn default_linux_min_distance() -> i32 {
@@ -81,19 +81,19 @@ fn default_linux_min_speed() -> f32 {
 }
 
 fn default_linux_min_scroll_speed() -> f32 {
-    10.0
+    1.0
 }
 
 fn default_linux_max_scroll_speed() -> f32 {
-    800.0
+    100.0
 }
 
 fn default_linux_scroll_curve() -> Vec<(f32, f32)> {
     vec![
-        (0.0, 0.0),
-        (500.0, 500.0),
-        (1000.0, 1000.0),
-        (2000.0, 2000.0),
+        (0.0, 1.6335227),
+        (1305.0, 3.90625),
+        (1730.0, 21.448864),
+        (2000.0, 79.360794),
     ]
 }
 
@@ -137,13 +137,13 @@ impl Default for AppConfig {
         Self {
             mappings,
             release_delay_ms: 200,
-            scroll_sensitivity: 100,
-            scroll_speed: 50,
-            scroll_invert: false,
+            scroll_sensitivity: 1,
+            scroll_speed: 5,
+            scroll_invert: true,
             linux_min_distance: 0,
             linux_min_speed: 0.0,
-            linux_min_scroll_speed: 0.0,
-            linux_max_scroll_speed: 800.0,
+            linux_min_scroll_speed: 1.0,
+            linux_max_scroll_speed: 100.0,
             linux_use_scroll_curve: true,
             linux_scroll_curve: default_linux_scroll_curve(),
         }

@@ -171,15 +171,12 @@ impl HookWorker {
                     #[cfg(target_os = "linux")]
                     {
                         self.total_movement_y += delta;
-                        let current_speed = (delta / _dt).abs();
+                        let _current_speed = (delta / _dt).abs();
 
-                        if !self.is_scrolling {
-                            if self.total_movement_y.abs() >= _min_dist as f32
-                                || current_speed >= _min_speed
-                            {
-                                self.is_scrolling = true;
-                            }
-                        }
+                        // デッドゾーンを廃止: マウス移動が検出された時点で即座にスクロール開始
+                        // _min_dist / _min_speed は参照のみ維持（コンパイラ警告回避）
+                        let _ = (_min_dist, _min_speed);
+                        self.is_scrolling = true;
                     }
 
                     #[cfg(not(target_os = "linux"))]
@@ -190,6 +187,12 @@ impl HookWorker {
                     if self.is_scrolling {
                         let gain = (global_sens as f32) / 100.0;
                         let speed = (global_speed as f32) / 100.0;
+
+                        // Linux: send_mouse_scroll は直接パススルーなのでスケール不要
+                        // Windows: 従来通り LINEAR_SCALE=40 を維持
+                        #[cfg(target_os = "linux")]
+                        const LINEAR_SCALE: f32 = 1.0;
+                        #[cfg(not(target_os = "linux"))]
                         const LINEAR_SCALE: f32 = 40.0;
 
                         #[cfg(target_os = "linux")]
