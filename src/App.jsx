@@ -395,16 +395,13 @@ const CurveEditor = ({ points, onChange, maxY = 2000 }) => {
         <text x={width / 2} y={height - 8} fill="#888" fontSize="11" textAnchor="middle">Input Mouse Speed (px/s)</text>
         <text x={12} y={height / 2} fill="#888" fontSize="11" transform={`rotate(-90, 12, ${height / 2})`} textAnchor="middle">Scroll Output</text>
 
-        <path d={pathData} fill="none" stroke="url(#curveGrad)" strokeWidth="3" strokeLinejoin="round" filter="url(#glow)" />
+        <path d={pathData} fill="none" stroke="url(#curveGrad)" strokeWidth="3" strokeLinejoin="round" />
         <defs>
           <linearGradient id="curveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" style={{ stopColor: "#00d2ff" }} />
             <stop offset="100%" style={{ stopColor: "#3a7bd5" }} />
           </linearGradient>
-          <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-            <blur stdDeviation="2" result="blur" />
-            <composite in="SourceGraphic" in2="blur" operator="over" />
-          </filter>
+
         </defs>
 
         {sortedPoints.map((p, i) => (
@@ -613,7 +610,7 @@ function App() {
             <h2>About YATS</h2>
             <p><strong>YATS</strong> stands for:</p>
             <p className="yats-full-name">Yet Another Touchpad Shortcut</p>
-            <p className="version-info">Version 1.2.14</p>
+            <p className="version-info">Version 1.3.0</p>
             <button className="btn-close-modal" onClick={() => setShowAbout(false)}>Close</button>
           </div>
         </div>
@@ -663,7 +660,7 @@ function App() {
       {showScrollTuning && (
         <div className="modal-overlay" onClick={() => setShowScrollTuning(false)}>
           <div className="modal-content scroll-tuning-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "600px", width: "95%" }}>
-            <h2>Scroll Tuning (Linux)</h2>
+            <h2>Scroll Tuning</h2>
             <div className="modal-body">
               <div className="minor-settings" style={{ marginBottom: "16px" }}>
                 <label className="checkbox-item">
@@ -729,7 +726,7 @@ function App() {
                   <p className="setting-hint">Caps the scroll acceleration (Curve Y-Axis).</p>
                   <div className="setting-row">
                     <input
-                      type="range" min="10" max="200" step="1"
+                      type="range" min="10" max="2000" step="10"
                       value={linuxMaxScrollSpeed}
                       onChange={(e) => {
                         const val = parseFloat(e.target.value);
@@ -740,10 +737,10 @@ function App() {
                         saveConfigWithLatest({ linuxMaxScrollSpeed: val, linuxScrollCurve: clamped });
                       }}
                     />
-                    <input type="number" min="10" max="200" value={linuxMaxScrollSpeed} onChange={(e) => {
+                    <input type="number" min="10" max="2000" value={linuxMaxScrollSpeed} onChange={(e) => {
                       let val = parseFloat(e.target.value);
                       if (isNaN(val) || val < 10) val = 10;
-                      if (val > 200) val = 200;
+                      if (val > 2000) val = 2000;
                       setLinuxMaxScrollSpeed(val);
                       const clamped = linuxScrollCurve.map(p => [p[0], Math.min(p[1], val)]);
                       setLinuxScrollCurve(clamped);

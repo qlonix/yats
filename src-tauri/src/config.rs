@@ -85,7 +85,10 @@ fn default_linux_min_scroll_speed() -> f32 {
 }
 
 fn default_linux_max_scroll_speed() -> f32 {
-    100.0
+    #[cfg(target_os = "linux")]
+    return 100.0;
+    #[cfg(target_os = "windows")]
+    return 1000.0;
 }
 
 fn default_linux_scroll_curve() -> Vec<(f32, f32)> {

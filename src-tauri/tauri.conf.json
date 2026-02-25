@@ -13,6 +13,7 @@
     "windows": [
       {
         "label": "main",
+        "url": "index.html",
         "title": "YATS Settings",
         "width": 800,
         "height": 600,
