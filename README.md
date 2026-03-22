@@ -14,7 +14,7 @@ YATS ではタッチパッドへ触れているかどうかではなく、マウ
 
 そのため、ThumbSense ほど精度の高いトリガー検出はできませんが、その代わり Synaptics/ALPS 以外のタッチパッドでも動作することができます。
 
-タッチパッドである必要もないので、トラックポイントや [Nape Pro](https://www.gizmodo.jp/2025/11/gizmart-nape-pro.html) とも相性が良いのではないかと思います。
+タッチパッドである必要すらないので、トラックポイントや [Nape Pro](https://www.gizmodo.jp/2025/11/gizmart-nape-pro.html) と組み合わせての操作も可能です。
 
 ## 機能
 
@@ -34,22 +34,17 @@ YATS ではタッチパッドへ触れているかどうかではなく、マウ
 
 #### 必須要件
 
-**重要**: Linuxでは、タッチパッドにアクセスするために、使用するユーザーを `input` グループに追加する必要があります。
+**重要**: Linuxでは、タッチパッド入力の監視と仮想キーボード操作（`uinput`）を行うために、適切なデバイスアクセス権限が必要です。
 
-```bash
-sudo usermod -a -G input $USER
-```
+1. **ユーザーグループの追加**:
+   現在のユーザーを `input` グループに追加してください。
+   ```bash
+   sudo usermod -a -G input $USER
+   ```
+   変更を反映するには、**ログアウトして再ログイン**（または再起動）してください。確認するには `groups` コマンドを実行し、出力に `input` が含まれるか確認します。
 
-変更を反映するには、**ログアウトして再ログイン**（または再起動）してください。
-
-**確認方法**:
-
-`input` グループに追加されたか確認するには:
-```bash
-groups
-```
-
-出力に `input` が含まれていれば成功です。
+2. **udev ルールの設定**:
+   仮想キーボードの機能を利用するためには、各デバイスおよび `/dev/uinput` へのアクセス権限が必要です。（`.deb` パッケージを利用する場合は自動的にインストールされますが、`.AppImage` の場合は手作業での導入が必要です）。
 
 #### インストール方法
 
@@ -59,24 +54,26 @@ sudo dpkg -i yats_*.deb
 ```
 
 **その他のディストリビューション (.AppImage)**:
+
+AppImage版を実行するには、事前に以下の udev ルールを手動でセットアップする必要があります。これを怠ると、権限エラーでYATSの一部機能（キーのリマップ等）が動作しません。
+
+```bash
+# リポジトリからudevルールをダウンロード
+sudo curl -o /etc/udev/rules.d/99-yats-touchpad.rules \
+  https://raw.githubusercontent.com/qlonix/yats/main/src-tauri/resources/99-yats-touchpad.rules
+
+# udevルールを再読み込み
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
+
+セットアップが完了したら、AppImageを実行可能にして起動します。
 ```bash
 chmod +x yats_*.AppImage
 ./yats_*.AppImage
 ```
 
-> **注意**: AppImageには以下の制約があります：
-> - **推奨**: 可能であれば `.deb` パッケージの使用を推奨します
-> - **udevルール**: AppImageではudevルールが自動インストールされないため、手動でセットアップが必要です：
->   ```bash
->   # リポジトリからudevルールをダウンロード
->   sudo curl -o /etc/udev/rules.d/99-yats-touchpad.rules \
->     https://raw.githubusercontent.com/qlonix/yats/main/src-tauri/resources/99-yats-touchpad.rules
->   
->   # udevルールを再読み込み
->   sudo udevadm control --reload-rules
->   sudo udevadm trigger
->   ```
-> - **FUSE要件**: AppImageの実行にはFUSEが必要です（最近のディストリビューションには通常含まれています）
+> **注意**: AppImageの実行にはFUSEが必要です（最近のディストリビューションには通常含まれています）。可能であれば `.deb` パッケージの使用を推奨します。
 
 ## 開発
 

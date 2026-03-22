@@ -17,3 +17,6 @@ SUBSYSTEM=="input", KERNEL=="event[0-9]*", ATTRS{name}=="*bcm5974*", MODE="0666"
 SUBSYSTEM=="input", KERNEL=="event[0-9]*", ATTRS{name}=="*[Kk]eyboard*", MODE="0666"
 SUBSYSTEM=="input", KERNEL=="event[0-9]*", ATTRS{name}=="*AT Translated*", MODE="0666"
 SUBSYSTEM=="input", KERNEL=="event[0-9]*", ATTRS{name}=="*Apple*Keyboard*", MODE="0666"
+
+# Allow access to uinput (required for virtual keyboard simulation)
+KERNEL=="uinput", MODE="0666"

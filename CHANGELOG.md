@@ -5,6 +5,13 @@ All notable changes to YATS (Yet Another Touchpad Shortcut) will be documented i
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-03-22
+
+### Fixed
+- **Linux Panic Fix**: Fixed an issue where the application would panic (`uinput init fail`) on startup if the user lacked permissions for `/dev/uinput`. The app now gracefully handles the permission error and logs it instead of crashing.
+- **Documentation**: Updated README to clarify that `/dev/uinput` requires proper permissions (via `udev` rules) for the virtual keyboard simulation feature on Linux.
+- **Udev Rules**: Added `KERNEL=="uinput", MODE="0666"` rule to `99-yats-touchpad.rules` to automatically grant access to the `uinput` module.
+
 ## [1.3.0] - 2026-02-16
 
 ### Fixed

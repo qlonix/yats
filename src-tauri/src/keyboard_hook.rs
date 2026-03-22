@@ -401,12 +401,20 @@ impl KeyboardHook {
                 }
 
                 // Create a single virtual uinput device for all keyboards
-                let mut uinput_builder = evdev::uinput::VirtualDeviceBuilder::new()
-                    .unwrap_or_else(|e| {
-                        crate::audit_log(&format!("[HOOK] Failed to init uinput builder: {}", e));
-                        panic!("uinput init fail");
-                    })
-                    .name("YATS Virtual Keyboard");
+                let mut uinput_builder = match evdev::uinput::VirtualDeviceBuilder::new() {
+                    Ok(builder) => builder.name("YATS Virtual Keyboard"),
+                    Err(e) => {
+                        crate::audit_log(&format!(
+                            "[HOOK] Failed to init uinput builder: {}. Please check /dev/uinput permissions.",
+                            e
+                        ));
+                        eprintln!("[HOOK] /dev/uinput permission denied. Please add udev rules.");
+                        // Drop grabbed devices gracefully before sleeping
+                        drop(devices);
+                        std::thread::sleep(std::time::Duration::from_secs(5));
+                        continue;
+                    }
+                };
 
                 // Copy capabilities from all grabbed devices
                 let mut keys = evdev::AttributeSet::<evdev::Key>::default();
@@ -422,10 +430,16 @@ impl KeyboardHook {
                     .with_keys(&keys)
                     .expect("Failed to add keys to uinput builder");
 
-                let mut virtual_device = uinput_builder.build().unwrap_or_else(|e| {
-                    crate::audit_log(&format!("[HOOK] Failed to build uinput device: {}", e));
-                    panic!("uinput build fail");
-                });
+                let mut virtual_device = match uinput_builder.build() {
+                    Ok(dev) => dev,
+                    Err(e) => {
+                        crate::audit_log(&format!("[HOOK] Failed to build uinput device: {}", e));
+                        eprintln!("[HOOK] uinput build failed: {}", e);
+                        drop(devices);
+                        std::thread::sleep(std::time::Duration::from_secs(5));
+                        continue;
+                    }
+                };
 
                 let mut threads = Vec::new();
                 let virtual_device = Arc::new(Mutex::new(virtual_device));
