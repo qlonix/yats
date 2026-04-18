@@ -1,12 +1,14 @@
 services:
   build:
     build: .
+    privileged: true
     volumes:
       - .:/app
       - cargo-cache:/root/.cargo/registry
       - target-cache:/app/src-tauri/target
     environment:
       - NODE_ENV=production
+      - APPIMAGE_EXTRACT_AND_RUN=1
 
 volumes:
   cargo-cache:

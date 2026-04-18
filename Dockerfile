@@ -16,8 +16,12 @@ RUN apt-get update && apt-get install -y \
     libsoup-3.0-dev \
     libssl-dev \
     pkg-config \
+    libevdev-dev \
+    xdg-utils \
     git \
     && rm -rf /var/lib/apt/lists/*
+
+
 
 # Node.js のインストール
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \

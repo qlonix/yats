@@ -41,6 +41,8 @@ sudo apt-get install -y \
     libsoup-3.0-dev \
     libssl-dev \
     pkg-config \
+    libevdev-dev \
+    xdg-utils \
     git
 ```
 
