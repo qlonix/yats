@@ -34,17 +34,24 @@ YATS ではタッチパッドへ触れているかどうかではなく、マウ
 
 #### 必須要件
 
-**重要**: Linuxでは、タッチパッド入力の監視と仮想キーボード操作（`uinput`）を行うために、適切なデバイスアクセス権限が必要です。
+**重要**: Linuxでは、キーボード入力の監視と仮想デバイスの作成（リマップ）を行うために、適切なデバイスアクセス権限が必要です。
 
 1. **ユーザーグループの追加**:
    現在のユーザーを `input` グループに追加してください。
    ```bash
    sudo usermod -a -G input $USER
    ```
-   変更を反映するには、**ログアウトして再ログイン**（または再起動）してください。確認するには `groups` コマンドを実行し、出力に `input` が含まれるか確認します。
+   変更を反映するには、**一度ログアウトして再ログイン**（または再起動）してください。
 
-2. **udev ルールの設定**:
-   仮想キーボードの機能を利用するためには、各デバイスおよび `/dev/uinput` へのアクセス権限が必要です。（`.deb` パッケージを利用する場合は自動的にインストールされますが、`.AppImage` の場合は手作業での導入が必要です）。
+2. **ランタイム依存パッケージのインストール**:
+   ウィンドウ操作機能（閉じる、最大化など）を利用するには、以下のツールが必要です。
+   ```bash
+   # Debian/Ubuntu系
+   sudo apt install xdotool wmctrl
+   ```
+
+3. **udev ルールの設定**:
+   仮想キーボードの機能を利用するためには、各デバイスおよび `/dev/uinput` へのアクセス権限が必要です。（`.deb` パッケージを利用する場合は自動的に設定されますが、`.AppImage` の場合は手作業での導入が必要です）。
 
 #### インストール方法
 
@@ -55,16 +62,15 @@ sudo dpkg -i yats_*.deb
 
 **その他のディストリビューション (.AppImage)**:
 
-AppImage版を実行するには、事前に以下の udev ルールを手動でセットアップする必要があります。これを怠ると、権限エラーでYATSの一部機能（キーのリマップ等）が動作しません。
+AppImage版を実行するには、事前に以下の udev ルールを手動でセットアップしてください。
 
 ```bash
 # リポジトリからudevルールをダウンロード
-sudo curl -o /etc/udev/rules.d/99-yats-touchpad.rules \
+sudo curl -o /etc/udev/rules.d/99-yats.rules \
   https://raw.githubusercontent.com/qlonix/yats/main/src-tauri/resources/99-yats-touchpad.rules
 
 # udevルールを再読み込み
-sudo udevadm control --reload-rules
-sudo udevadm trigger
+sudo udevadm control --reload-rules && sudo udevadm trigger
 ```
 
 セットアップが完了したら、AppImageを実行可能にして起動します。
@@ -73,7 +79,9 @@ chmod +x yats_*.AppImage
 ./yats_*.AppImage
 ```
 
-> **注意**: AppImageの実行にはFUSEが必要です（最近のディストリビューションには通常含まれています）。可能であれば `.deb` パッケージの使用を推奨します。
+#### 既知の制限 (Linux)
+- **Wayland 環境**: ウィンドウ操作（`xdotool` を使用する機能）は Wayland 上では動作しない場合があります。リマップやスクロール機能は動作します。
+- **権限**: デバイスへのアクセス権限が不足していると、キーのリマップが機能しません。必ず上記の udev ルールまたはグループ設定を確認してください。
 
 ## 開発
 
