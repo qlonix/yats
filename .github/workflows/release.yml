@@ -38,7 +38,7 @@ jobs:
           tagName: v__VERSION__
           releaseName: "YATS v__VERSION__"
           releaseBody: "See the assets below for the latest installers."
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
