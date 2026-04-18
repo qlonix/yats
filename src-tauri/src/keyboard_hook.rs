@@ -430,7 +430,7 @@ impl KeyboardHook {
                     .with_keys(&keys)
                     .expect("Failed to add keys to uinput builder");
 
-                let mut virtual_device = match uinput_builder.build() {
+                let virtual_device = match uinput_builder.build() {
                     Ok(dev) => dev,
                     Err(e) => {
                         crate::audit_log(&format!("[HOOK] Failed to build uinput device: {}", e));
@@ -451,7 +451,7 @@ impl KeyboardHook {
                     let v_dev = Arc::clone(&virtual_device);
 
                     threads.push(std::thread::spawn(move || {
-                        let mut pressed_keys = std::collections::HashSet::new();
+                        let mut pressed_keys = std::collections::HashMap::new();
                         loop {
                             let events = match device.fetch_events() {
                                 Ok(it) => it.collect::<Vec<_>>(),
@@ -465,69 +465,74 @@ impl KeyboardHook {
 
                                     // Map evdev code to rdev Key
                                     if let Some(rkey) = evdev_to_rdev_key(code) {
-                                        let is_remap = {
-                                            let cfg = config_inner.read().unwrap();
-                                            cfg.mappings.contains_key(&rkey)
-                                        };
-
-                                        let touched = monitor_inner.is_touched();
-                                        let paused = IS_PAUSED.load(Ordering::SeqCst);
-                                        let simulating = IS_SIMULATING.load(Ordering::SeqCst);
-
-                                        if is_remap && touched && !paused && !simulating {
-                                            if value == 1 {
+                                        match value {
+                                            1 => {
                                                 // Press
-                                                pressed_keys.insert(rkey);
-                                                let action = {
+                                                let is_remap = {
                                                     let cfg = config_inner.read().unwrap();
-                                                    cfg.mappings.get(&rkey).cloned()
+                                                    cfg.mappings.contains_key(&rkey)
                                                 };
-                                                if let Some(action) = action {
-                                                    match action {
-                                                        Action::MouseScroll(cfg) => {
-                                                            monitor_inner.consume_y_delta();
-                                                            let _ = tx_inner.send(
-                                                                RemapCommand::UpdateScroll(Some(
-                                                                    cfg,
-                                                                )),
-                                                            );
-                                                        }
-                                                        _ => {
-                                                            let _ = tx_inner.send(
-                                                                RemapCommand::Execute(action, true),
-                                                            );
-                                                        }
-                                                    }
-                                                }
-                                            } else if value == 0 {
-                                                // Release
-                                                if pressed_keys.remove(&rkey) {
+
+                                                let touched = monitor_inner.is_touched();
+                                                let paused = IS_PAUSED.load(Ordering::SeqCst);
+                                                let simulating = IS_SIMULATING.load(Ordering::SeqCst);
+
+                                                if is_remap && touched && !paused && !simulating {
                                                     let action = {
                                                         let cfg = config_inner.read().unwrap();
                                                         cfg.mappings.get(&rkey).cloned()
                                                     };
                                                     if let Some(action) = action {
+                                                        pressed_keys.insert(rkey, action.clone());
                                                         match action {
-                                                            Action::MouseScroll(_) => {
+                                                            Action::MouseScroll(cfg) => {
+                                                                monitor_inner.consume_y_delta();
                                                                 let _ = tx_inner.send(
-                                                                    RemapCommand::UpdateScroll(
-                                                                        None,
-                                                                    ),
+                                                                    RemapCommand::UpdateScroll(Some(
+                                                                        cfg,
+                                                                    )),
                                                                 );
                                                             }
                                                             _ => {
                                                                 let _ = tx_inner.send(
-                                                                    RemapCommand::Execute(
-                                                                        action, false,
-                                                                    ),
+                                                                    RemapCommand::Execute(action, true),
                                                                 );
                                                             }
                                                         }
+                                                        // Consume event (do not pass through)
+                                                        continue;
                                                     }
                                                 }
                                             }
-                                            // Consume event (do not pass through)
-                                            continue;
+                                            0 => {
+                                                // Release
+                                                if let Some(action) = pressed_keys.remove(&rkey) {
+                                                    match action {
+                                                        Action::MouseScroll(_) => {
+                                                            let _ = tx_inner.send(
+                                                                RemapCommand::UpdateScroll(None),
+                                                            );
+                                                        }
+                                                        _ => {
+                                                            let _ = tx_inner.send(
+                                                                RemapCommand::Execute(
+                                                                    action, false,
+                                                                ),
+                                                            );
+                                                        }
+                                                    }
+                                                    // Consume event (do not pass through)
+                                                    continue;
+                                                }
+                                            }
+                                            2 => {
+                                                // Repeat
+                                                if pressed_keys.contains_key(&rkey) {
+                                                    // Consume event (do not pass through)
+                                                    continue;
+                                                }
+                                            }
+                                            _ => {}
                                         }
                                     }
                                 }
