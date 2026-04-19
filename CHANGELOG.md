@@ -5,6 +5,11 @@ All notable changes to YATS (Yet Another Touchpad Shortcut) will be documented i
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.4] - 2026-04-19
+
+### Changed
+- **Documentation**: Updated README to include instructions on how to handle the Windows SmartScreen warning ("Windows protected your PC") during installation. Added both Japanese and English explanations.
+
 ## [1.3.1] - 2026-03-22
 
 ### Fixed

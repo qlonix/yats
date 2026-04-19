@@ -30,6 +30,11 @@ YATS ではタッチパッドへ触れているかどうかではなく、マウ
 
 インストーラー（.msi または .exe）をダウンロードして実行してください。
 
+> [!NOTE]
+> **「Windows によって PC が保護されました」と表示される場合**  
+> 本ソフトは個人開発のオープンソースソフトウェアであり、高価なデジタル署名（コードサイニング）を施していないため、Windows SmartScreen によって警告が表示されることがあります。
+> インストールを続行するには、画面上の**「詳細情報」**をクリックし、表示された**「実行」**ボタンを押してください。
+
 ### Linux
 
 #### 必須要件
@@ -124,6 +129,11 @@ Since it doesn't even need to be a touchpad, it can also be used in combination 
 ### Windows
 
 Download and run the installer (.msi or .exe).
+
+> [!NOTE]
+> **If "Windows protected your PC" appears**  
+> Since this is an open-source project by an individual developer without an expensive digital signature, Windows SmartScreen may show a warning.
+> To proceed, click **"More info"** on the warning screen and then click the **"Run anyway"** button.
 
 ### Linux
 
