@@ -10,8 +10,6 @@ use crate::touchpad_monitor::TouchpadMonitor;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
-#[cfg(target_os = "windows")]
-use std::process::Command;
 use std::sync::atomic::Ordering;
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
@@ -149,48 +147,9 @@ fn set_paused_cmd(app: tauri::AppHandle, paused: bool) {
 }
 
 // Startup functions using platform-specific implementation
-#[cfg(target_os = "windows")]
 #[tauri::command]
 fn set_startup_cmd(enabled: bool) -> Result<(), String> {
     audit_log(&format!("[SYSTEM] Startup toggle requested: {}", enabled));
-
-    // Note: Windows startup now uses shortcut method from the platform module
-    // but we keep the custom logic here for backwards compatibility
-    let app_data = std::env::var("APPDATA").map_err(|e| e.to_string())?;
-    let mut startup_path = std::path::PathBuf::from(app_data);
-    startup_path.push(r"Microsoft\Windows\Start Menu\Programs\Startup");
-    startup_path.push("YATS.lnk");
-
-    if enabled {
-        let exe_path = std::env::current_exe().map_err(|e| e.to_string())?;
-        let exe_str = exe_path.to_str().ok_or("Invalid exe path")?;
-        let lnk_str = startup_path.to_str().ok_or("Invalid shortcut path")?;
-
-        let script = format!(
-            "$s=(New-Object -ComObject WScript.Shell).CreateShortcut('{}');$s.TargetPath='{}';$s.Save()",
-            lnk_str, exe_str
-        );
-
-        use std::os::windows::process::CommandExt;
-        Command::new("powershell")
-            .args(&["-Command", &script])
-            .creation_flags(0x08000000)
-            .status()
-            .map_err(|e| e.to_string())?;
-
-        audit_log("[SYSTEM] Startup shortcut created.");
-    } else {
-        if startup_path.exists() {
-            std::fs::remove_file(startup_path).map_err(|e| e.to_string())?;
-            audit_log("[SYSTEM] Startup shortcut removed.");
-        }
-    }
-    Ok(())
-}
-
-#[cfg(target_os = "linux")]
-#[tauri::command]
-fn set_startup_cmd(enabled: bool) -> Result<(), String> {
     platform::Platform::set_startup(enabled)
 }
 
@@ -201,125 +160,20 @@ fn get_startup_status_cmd() -> bool {
 
 #[tauri::command]
 fn get_aap_threshold() -> Result<i32, String> {
-    #[cfg(target_os = "windows")]
-    {
-        // Keep the custom implementation here for now
-        let output = Command::new("reg")
-            .args(&[
-                "query",
-                "HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad",
-                "/v",
-                "AAPThreshold",
-            ])
-            .output()
-            .map_err(|e| e.to_string())?;
-
-        if !output.status.success() {
-            return Ok(2);
-        }
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        for line in stdout.lines() {
-            if line.contains("AAPThreshold") {
-                let parts: Vec<&str> = line.split_whitespace().collect();
-                if parts.len() >= 3 {
-                    let val_str = parts[parts.len() - 1];
-                    if val_str.starts_with("0x") {
-                        if let Ok(val) = i32::from_str_radix(&val_str[2..], 16) {
-                            return Ok(val);
-                        }
-                    }
-                }
-            }
-        }
-        Ok(2)
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        platform::Platform::get_aap_threshold()
-    }
+    platform::Platform::get_aap_threshold()
 }
 
 #[tauri::command]
 fn set_aap_threshold(value: i32) -> Result<(), String> {
-    #[cfg(target_os = "windows")]
-    {
-        audit_log(&format!(
-            "[SYSTEM] Changing AAPThreshold Registry to {}",
-            value
-        ));
-        Command::new("reg")
-            .args(&[
-                "add",
-                "HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad",
-                "/v",
-                "AAPThreshold",
-                "/t",
-                "REG_DWORD",
-                "/d",
-                &value.to_string(),
-                "/f",
-            ])
-            .status()
-            .map_err(|e| e.to_string())?;
-        Ok(())
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        platform::Platform::set_aap_threshold(value)
-    }
+    audit_log(&format!("[SYSTEM] Changing AAPThreshold to {}", value));
+    platform::Platform::set_aap_threshold(value)
 }
 
-#[cfg(target_os = "windows")]
 #[tauri::command]
 fn deep_registry_clean_cmd() -> Result<String, String> {
-    if !platform::Platform::is_elevated() {
-        return Err("管理者権限が必要です。".to_string());
+    if platform::Platform::is_elevated() {
+        audit_log("[SYSTEM] Deep Registry Clean requested with elevation.");
     }
-    let mut results = Vec::new();
-    let sync_keys = [
-        (
-            "HKEY_LOCAL_MACHINE\\SOFTWARE\\Synaptics\\SynTP\\Defaults",
-            "PalmKms",
-        ),
-        (
-            "HKEY_LOCAL_MACHINE\\SOFTWARE\\Synaptics\\SynTP\\Defaults",
-            "SimultaneousTimeThreshold",
-        ),
-    ];
-    for (path, val) in sync_keys {
-        let _ = Command::new("reg")
-            .args(&["add", path, "/v", val, "/t", "REG_DWORD", "/d", "0", "/f"])
-            .status();
-        results.push(format!("Synced {}", val));
-    }
-    let elan_path = "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Elantech\\SmartPad";
-    let _ = Command::new("reg")
-        .args(&[
-            "add",
-            elan_path,
-            "/v",
-            "DisableWhenType_Enable",
-            "/t",
-            "REG_DWORD",
-            "/d",
-            "0",
-            "/f",
-        ])
-        .status();
-    results.push("Synced ELAN SmartPad".to_string());
-    audit_log(&format!(
-        "[SYSTEM] Deep Registry Clean performed: {:?}",
-        results
-    ));
-    Ok(results.join(", "))
-}
-
-#[cfg(target_os = "linux")]
-#[tauri::command]
-fn deep_registry_clean_cmd() -> Result<String, String> {
     platform::Platform::deep_registry_clean()
 }
 

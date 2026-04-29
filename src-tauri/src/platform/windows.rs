@@ -1,6 +1,8 @@
 // Windows-specific platform implementations
 
 use crate::config::{MouseButton, WindowAction};
+use std::process::Command;
+use std::os::windows::process::CommandExt;
 use winapi::um::winuser::*;
 use winreg::enums::*;
 use winreg::RegKey;
@@ -104,6 +106,17 @@ impl super::SystemInfo for WindowsPlatform {
     }
 
     fn get_startup_status() -> bool {
+        // Check shortcut in Startup folder (preferred method)
+        if let Ok(app_data) = std::env::var("APPDATA") {
+            let mut startup_path = std::path::PathBuf::from(app_data);
+            startup_path.push(r"Microsoft\Windows\Start Menu\Programs\Startup");
+            startup_path.push("YATS.lnk");
+            if startup_path.exists() {
+                return true;
+            }
+        }
+
+        // Fallback to Registry Run key (legacy method)
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         if let Ok(run_key) = hkcu.open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Run") {
             run_key.get_value::<String, _>("YATS").is_ok()
@@ -113,40 +126,54 @@ impl super::SystemInfo for WindowsPlatform {
     }
 
     fn set_startup(enabled: bool) -> Result<(), String> {
-        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-        let run_key = hkcu
-            .open_subkey_with_flags(
-                "Software\\Microsoft\\Windows\\CurrentVersion\\Run",
-                KEY_WRITE,
-            )
-            .map_err(|e| format!("Failed to open Run key: {}", e))?;
+        let app_data = std::env::var("APPDATA").map_err(|e| e.to_string())?;
+        let mut startup_path = std::path::PathBuf::from(app_data);
+        startup_path.push(r"Microsoft\Windows\Start Menu\Programs\Startup");
+        startup_path.push("YATS.lnk");
 
         if enabled {
-            let exe_path =
-                std::env::current_exe().map_err(|e| format!("Failed to get exe path: {}", e))?;
-            let path_str = exe_path
-                .to_str()
-                .ok_or("Failed to convert path to string")?;
-            run_key
-                .set_value("YATS", &path_str)
-                .map_err(|e| format!("Failed to set registry value: {}", e))?;
+            let exe_path = std::env::current_exe().map_err(|e| e.to_string())?;
+            let exe_str = exe_path.to_str().ok_or("Invalid exe path")?;
+            let lnk_str = startup_path.to_str().ok_or("Invalid shortcut path")?;
+
+            let script = format!(
+                "$s=(New-Object -ComObject WScript.Shell).CreateShortcut('{}');$s.TargetPath='{}';$s.Save()",
+                lnk_str, exe_str
+            );
+
+            Command::new("powershell")
+                .args(&["-Command", &script])
+                .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                .status()
+                .map_err(|e| e.to_string())?;
         } else {
-            run_key
-                .delete_value("YATS")
-                .map_err(|e| format!("Failed to delete registry value: {}", e))?;
+            if startup_path.exists() {
+                std::fs::remove_file(startup_path).map_err(|e| e.to_string())?;
+            }
+
+            // Also clean up legacy registry entry if exists
+            let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+            if let Ok(run_key) = hkcu.open_subkey_with_flags(
+                "Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+                KEY_WRITE,
+            ) {
+                let _ = run_key.delete_value("YATS");
+            }
         }
         Ok(())
     }
 
     fn get_aap_threshold() -> Result<i32, String> {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-        let key = hkcu
-            .open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad")
-            .map_err(|e| format!("Failed to open PrecisionTouchPad key: {}", e))?;
+        let key = match hkcu.open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad") {
+            Ok(k) => k,
+            Err(_) => return Ok(2), // Default fallback
+        };
 
-        key.get_value::<u32, _>("AAPThreshold")
-            .map(|v| v as i32)
-            .map_err(|e| format!("Failed to get AAPThreshold: {}", e))
+        match key.get_value::<u32, _>("AAPThreshold") {
+            Ok(v) => Ok(v as i32),
+            Err(_) => Ok(2), // Default fallback
+        }
     }
 
     fn set_aap_threshold(value: i32) -> Result<(), String> {
@@ -166,6 +193,7 @@ impl super::SystemInfo for WindowsPlatform {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         let mut report = String::new();
 
+        // 1. Precision Touchpad Status
         if let Ok((key, _)) = hkcu.create_subkey(
             "Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad\\Status",
         ) {
@@ -180,6 +208,33 @@ impl super::SystemInfo for WindowsPlatform {
         ) {
             if key.delete_value("LeaveOnLevel").is_ok() {
                 report.push_str("Deleted: LeaveOnLevel\n");
+            }
+        }
+
+        // 2. Synaptics / ELAN / System-wide settings (from lib.rs)
+        // These often require admin rights, but we try anyway (is_elevated check is done in command)
+        let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+
+        // Synaptics
+        if let Ok(key) = hklm.open_subkey_with_flags(
+            "SOFTWARE\\Synaptics\\SynTP\\Defaults",
+            KEY_WRITE,
+        ) {
+            if key.set_value("PalmKms", &0u32).is_ok() {
+                report.push_str("Synced: Synaptics PalmKms -> 0\n");
+            }
+            if key.set_value("SimultaneousTimeThreshold", &0u32).is_ok() {
+                report.push_str("Synced: Synaptics SimultaneousTimeThreshold -> 0\n");
+            }
+        }
+
+        // ELAN
+        if let Ok(key) = hklm.open_subkey_with_flags(
+            "SYSTEM\\CurrentControlSet\\Control\\Elantech\\SmartPad",
+            KEY_WRITE,
+        ) {
+            if key.set_value("DisableWhenType_Enable", &0u32).is_ok() {
+                report.push_str("Synced: ELAN DisableWhenType_Enable -> 0\n");
             }
         }
 

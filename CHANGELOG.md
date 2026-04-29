@@ -5,6 +5,17 @@ All notable changes to YATS (Yet Another Touchpad Shortcut) will be documented i
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.5] - 2026-04-29
+
+### Fixed
+- **未使用警告の解消**: Windows環境で `platform` モジュールの関数が未使用と判定されていた問題を、`lib.rs` のロジックを統合・集約することで解消。
+
+### Changed
+- **プラットフォームの実装整理**:
+  - `lib.rs` 内の Windows 固有ロジックを `platform\windows.rs` へ移動。
+  - Windows のスタートアップ登録を、レジストリ方式からスタートアップフォルダへのショートカット作成方式（PowerShell経由）に統一。
+  - AAPしきい値の取得・設定およびレジストリクリーンアップのロジックを `platform` モジュールに集約。
+
 ## [1.3.4] - 2026-04-19
 
 ### Changed
