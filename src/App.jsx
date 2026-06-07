@@ -782,71 +782,62 @@ function App() {
       )}
 
       <header>
-        <div className="title-group">
-          <YatsLogo />
-          <h1>YATS Settings <span className="about-link" onClick={() => setShowAbout(true)}>?</span></h1>
-          <div className="header-controls">
-            <label className="header-control-label">General:</label>
-            <div className="header-controls-row">
-              <label className="header-control-item">
-                <input type="checkbox" checked={autoStart} onChange={toggleAutoStart} />
-                Run on Startup
-              </label>
-              <label className="header-control-item delay-control">
-                Release Delay: <span className="value-display">{releaseDelay}</span>ms
-                <input
-                  type="range" min="10" max="1000" step="10"
-                  value={releaseDelay}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value);
-                    setReleaseDelay(val);
-                    saveConfigWithLatest({ releaseDelay: val });
-                  }}
-                />
-              </label>
-              <label className="header-control-item">
-                <input
-                  type="checkbox"
-                  checked={palmRejection}
-                  onChange={(e) => {
-                    const val = e.target.checked;
-                    setPalmRejection(val);
-                    saveConfigWithLatest({ palmRejection: val });
-                  }}
-                />
-                Palm Rejection
-              </label>
-              {palmRejection && (
-                <label className="header-control-item delay-control">
-                  Palm Delay: <span className="value-display">{palmRejectionDelay}</span>ms
-                  <input
-                    type="range" min="100" max="2000" step="50"
-                    value={palmRejectionDelay}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value);
-                      setPalmRejectionDelay(val);
-                      saveConfigWithLatest({ palmRejectionDelay: val });
-                    }}
-                  />
-                </label>
-              )}
+        <div className="header-top-row">
+          <div className="title-group">
+            <YatsLogo />
+            <h1>YATS Settings <span className="about-link" onClick={() => setShowAbout(true)}>?</span></h1>
+          </div>
+          <div className="status-container">
+            <div className={`status-badge ${isTouched ? "active" : ""}`}>
+              {isTouched ? "TOUCHED" : "IDLE"}
             </div>
-            {/* Advanced Settings ボタンは非表示（コードは残しておく）
-            <div style={{ marginTop: "10px", textAlign: "right" }}>
-              <button
-                className="btn-global-config"
-                style={{ fontSize: "0.8rem", padding: "4px 8px" }}
-                onClick={() => setShowLegacySettings(true)}
-              >
-                Advanced Settings...
-              </button>
-            </div>
-            */}
           </div>
         </div>
-        <div className="status-container">
-          <div className={`status-badge ${isTouched ? "active" : ""}`}>
-            {isTouched ? "TOUCHED" : "IDLE"}
+        <div className="header-controls">
+          <label className="header-control-label">General Settings</label>
+          <div className="header-controls-row">
+            <label className="header-control-item">
+              <input type="checkbox" checked={autoStart} onChange={toggleAutoStart} />
+              Run on Startup
+            </label>
+            <label className="header-control-item delay-control">
+              Release Delay: <span className="value-display">{releaseDelay}</span>ms
+              <input
+                type="range" min="10" max="1000" step="10"
+                value={releaseDelay}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value);
+                  setReleaseDelay(val);
+                  saveConfigWithLatest({ releaseDelay: val });
+                }}
+              />
+            </label>
+            <label className="header-control-item">
+              <input
+                type="checkbox"
+                checked={palmRejection}
+                onChange={(e) => {
+                  const val = e.target.checked;
+                  setPalmRejection(val);
+                  saveConfigWithLatest({ palmRejection: val });
+                }}
+              />
+              Palm Rejection
+            </label>
+            {palmRejection && (
+              <label className="header-control-item delay-control">
+                Palm Delay: <span className="value-display">{palmRejectionDelay}</span>ms
+                <input
+                  type="range" min="100" max="2000" step="50"
+                  value={palmRejectionDelay}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value);
+                    setPalmRejectionDelay(val);
+                    saveConfigWithLatest({ palmRejectionDelay: val });
+                  }}
+                />
+              </label>
+            )}
           </div>
         </div>
       </header>

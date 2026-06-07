@@ -340,6 +340,7 @@ impl KeyboardHook {
                         rdev::EventType::KeyRelease(key) => {
                             let mut keys = pressed_keys.lock().unwrap();
                             if !keys.remove(&key) {
+                                *last_typing_inner.lock().unwrap() = Some(std::time::Instant::now());
                                 return Some(event);
                             }
 
@@ -395,13 +396,17 @@ impl KeyboardHook {
                                 let caps = device.supported_events();
                                 let name = device.name().unwrap_or("Unknown").to_lowercase();
 
-                                // Only true keyboards (must have KEY events, but NOT RELATIVE or ABSOLUTE pointing axes)
-                                if caps.contains(evdev::EventType::KEY)
-                                    && !caps.contains(evdev::EventType::RELATIVE)
-                                    && !caps.contains(evdev::EventType::ABSOLUTE)
+                                // Only true keyboards: must have KEY events, support standard typing keys (like KEY_A and KEY_ENTER),
+                                // and name must not contain touchpad or mouse.
+                                let is_keyboard = caps.contains(evdev::EventType::KEY)
                                     && !name.contains("touchpad")
                                     && !name.contains("mouse")
-                                {
+                                    && device.supported_keys().map_or(false, |keys| {
+                                        keys.contains(evdev::Key::KEY_A)
+                                            && keys.contains(evdev::Key::KEY_ENTER)
+                                    });
+
+                                if is_keyboard {
                                     // Grab it!
                                     if device.grab().is_ok() {
                                         crate::audit_log(&format!(
@@ -564,6 +569,8 @@ impl KeyboardHook {
                                                     }
                                                     // Consume event (do not pass through)
                                                     continue;
+                                                } else {
+                                                    *last_typing_inner.lock().unwrap() = Some(std::time::Instant::now());
                                                 }
                                             }
                                             2 => {
@@ -571,6 +578,8 @@ impl KeyboardHook {
                                                 if pressed_keys.contains_key(&rkey) {
                                                     // Consume event (do not pass through)
                                                     continue;
+                                                } else {
+                                                    *last_typing_inner.lock().unwrap() = Some(std::time::Instant::now());
                                                 }
                                             }
                                             _ => {}

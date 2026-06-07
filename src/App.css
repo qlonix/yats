@@ -41,12 +41,20 @@ body {
 
 header {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
   margin-bottom: 15px;
-  padding-bottom: 10px;
+  padding-bottom: 12px;
   border-bottom: 2px solid rgba(255, 255, 255, 0.05);
   flex-shrink: 0;
+}
+
+.header-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
 }
 
 .title-group {
@@ -101,7 +109,8 @@ h1 {
 .header-controls {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  width: 100%;
 }
 
 .header-control-label {
@@ -115,7 +124,8 @@ h1 {
 .header-controls-row {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 12px 20px;
+  flex-wrap: wrap;
 }
 
 .header-control-item {
