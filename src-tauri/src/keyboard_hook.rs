@@ -14,6 +14,7 @@ pub struct KeyboardHook {
     monitor: Arc<TouchpadMonitor>,
     config: Arc<RwLock<AppConfig>>,
     tx: Sender<RemapCommand>,
+    last_typing_time: Arc<Mutex<Option<std::time::Instant>>>,
 }
 
 #[derive(Clone, Debug)]
@@ -262,6 +263,7 @@ impl KeyboardHook {
             monitor,
             config,
             tx,
+            last_typing_time: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -272,11 +274,13 @@ impl KeyboardHook {
             let tx = self.tx.clone();
             let config_ref = Arc::clone(&self.config);
             let monitor_ref = Arc::clone(&self.monitor);
+            let last_typing_ref = Arc::clone(&self.last_typing_time);
 
             loop {
                 let tx_inner = tx.clone();
                 let config_inner = Arc::clone(&config_ref);
                 let monitor_inner = Arc::clone(&monitor_ref);
+                let last_typing_inner = Arc::clone(&last_typing_ref);
                 let pressed_keys = Arc::new(Mutex::new(std::collections::HashSet::new()));
 
                 crate::audit_log("[HOOK] Calling rdev::grab...");
@@ -292,29 +296,45 @@ impl KeyboardHook {
                                 return None;
                             }
 
-                            if !monitor_inner.is_touched() {
-                                return Some(event);
-                            }
+                            let now = std::time::Instant::now();
+                            let is_palm_rejected = {
+                                let cfg = config_inner.read().unwrap();
+                                if cfg.palm_rejection {
+                                    if let Some(last_time) = *last_typing_inner.lock().unwrap() {
+                                        now.duration_since(last_time).as_millis() < cfg.palm_rejection_delay_ms as u128
+                                    } else {
+                                        false
+                                    }
+                                } else {
+                                    false
+                                }
+                            };
 
-                            keys.insert(key);
-
+                            let touched = monitor_inner.is_touched();
                             let action = {
                                 let cfg = config_inner.read().unwrap();
                                 cfg.mappings.get(&key).cloned()
                             };
 
-                            if let Some(action) = action {
-                                match action {
-                                    Action::MouseScroll(cfg) => {
-                                        monitor_inner.consume_y_delta();
-                                        let _ =
-                                            tx_inner.send(RemapCommand::UpdateScroll(Some(cfg)));
+                            let should_trigger = action.is_some() && touched && !is_palm_rejected;
+
+                            if should_trigger {
+                                keys.insert(key);
+                                if let Some(action) = action {
+                                    match action {
+                                        Action::MouseScroll(cfg) => {
+                                            monitor_inner.consume_y_delta();
+                                            let _ =
+                                                tx_inner.send(RemapCommand::UpdateScroll(Some(cfg)));
+                                        }
+                                        _ => {
+                                            let _ = tx_inner.send(RemapCommand::Execute(action, true));
+                                        }
                                     }
-                                    _ => {
-                                        let _ = tx_inner.send(RemapCommand::Execute(action, true));
-                                    }
+                                    return None;
                                 }
-                                return None;
+                            } else {
+                                *last_typing_inner.lock().unwrap() = Some(now);
                             }
                         }
                         rdev::EventType::KeyRelease(key) => {
@@ -361,6 +381,8 @@ impl KeyboardHook {
             let tx = self.tx.clone();
             let config_ref = Arc::clone(&self.config);
             let monitor_ref = Arc::clone(&self.monitor);
+
+            let last_typing_ref = Arc::clone(&self.last_typing_time);
 
             loop {
                 // Find all keyboards
@@ -448,6 +470,7 @@ impl KeyboardHook {
                     let tx_inner = tx.clone();
                     let config_inner = Arc::clone(&config_ref);
                     let monitor_inner = Arc::clone(&monitor_ref);
+                    let last_typing_inner = Arc::clone(&last_typing_ref);
                     let v_dev = Arc::clone(&virtual_device);
 
                     threads.push(std::thread::spawn(move || {
@@ -468,6 +491,20 @@ impl KeyboardHook {
                                         match value {
                                             1 => {
                                                 // Press
+                                                let now = std::time::Instant::now();
+                                                let is_palm_rejected = {
+                                                    let cfg = config_inner.read().unwrap();
+                                                    if cfg.palm_rejection {
+                                                        if let Some(last_time) = *last_typing_inner.lock().unwrap() {
+                                                            now.duration_since(last_time).as_millis() < cfg.palm_rejection_delay_ms as u128
+                                                        } else {
+                                                            false
+                                                        }
+                                                    } else {
+                                                        false
+                                                    }
+                                                };
+
                                                 let is_remap = {
                                                     let cfg = config_inner.read().unwrap();
                                                     cfg.mappings.contains_key(&rkey)
@@ -477,7 +514,9 @@ impl KeyboardHook {
                                                 let paused = IS_PAUSED.load(Ordering::SeqCst);
                                                 let simulating = IS_SIMULATING.load(Ordering::SeqCst);
 
-                                                if is_remap && touched && !paused && !simulating {
+                                                let should_trigger = is_remap && touched && !paused && !simulating && !is_palm_rejected;
+
+                                                if should_trigger {
                                                     let action = {
                                                         let cfg = config_inner.read().unwrap();
                                                         cfg.mappings.get(&rkey).cloned()
@@ -502,6 +541,8 @@ impl KeyboardHook {
                                                         // Consume event (do not pass through)
                                                         continue;
                                                     }
+                                                } else {
+                                                    *last_typing_inner.lock().unwrap() = Some(now);
                                                 }
                                             }
                                             0 => {

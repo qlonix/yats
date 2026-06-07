@@ -62,6 +62,10 @@ pub struct AppConfig {
     pub linux_use_scroll_curve: bool,
     #[serde(default = "default_linux_scroll_curve")]
     pub linux_scroll_curve: Vec<(f32, f32)>,
+    #[serde(default = "default_palm_rejection")]
+    pub palm_rejection: bool,
+    #[serde(default = "default_palm_rejection_delay")]
+    pub palm_rejection_delay_ms: u64,
 }
 
 fn default_sensitivity() -> u32 {
@@ -98,6 +102,14 @@ fn default_linux_scroll_curve() -> Vec<(f32, f32)> {
         (1730.0, 21.448864),
         (2000.0, 79.360794),
     ]
+}
+
+fn default_palm_rejection() -> bool {
+    true
+}
+
+fn default_palm_rejection_delay() -> u64 {
+    500
 }
 
 impl Default for AppConfig {
@@ -149,6 +161,8 @@ impl Default for AppConfig {
             linux_max_scroll_speed: 100.0,
             linux_use_scroll_curve: true,
             linux_scroll_curve: default_linux_scroll_curve(),
+            palm_rejection: true,
+            palm_rejection_delay_ms: 500,
         }
     }
 }

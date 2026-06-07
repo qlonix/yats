@@ -433,6 +433,8 @@ function App() {
   const [sortOrder, setSortOrder] = useState("asc");
   const [isPaused, setIsPaused] = useState(false);
   const [autoStart, setAutoStart] = useState(false);
+  const [palmRejection, setPalmRejection] = useState(true);
+  const [palmRejectionDelay, setPalmRejectionDelay] = useState(500);
   const [recordingMacroKey, setRecordingMacroKey] = useState(null);
   const [showScrollTuning, setShowScrollTuning] = useState(false);
   const [scrollInvert, setScrollInvert] = useState(true);
@@ -464,6 +466,8 @@ function App() {
         linux_max_scroll_speed: overrides.linuxMaxScrollSpeed !== undefined ? overrides.linuxMaxScrollSpeed : linuxMaxScrollSpeed,
         linux_use_scroll_curve: true, // Fixed as baseline
         linux_scroll_curve: overrides.linuxScrollCurve !== undefined ? overrides.linuxScrollCurve : linuxScrollCurve,
+        palm_rejection: overrides.palmRejection !== undefined ? overrides.palmRejection : palmRejection,
+        palm_rejection_delay_ms: overrides.palmRejectionDelay !== undefined ? parseInt(overrides.palmRejectionDelay) : palmRejectionDelay,
       };
 
       await invoke("set_config", { newConfig: updated });
@@ -503,6 +507,8 @@ function App() {
       setLinuxScrollCurve(config.linux_scroll_curve && config.linux_scroll_curve.length > 0 ? config.linux_scroll_curve : [
         [0, 1.6335227], [1305, 3.90625], [1730, 21.448864], [2000, 79.360794]
       ]);
+      setPalmRejection(config.palm_rejection ?? true);
+      setPalmRejectionDelay(config.palm_rejection_delay_ms ?? 500);
     } catch (err) {
       console.error("Failed to load config:", err);
     }
@@ -798,6 +804,32 @@ function App() {
                   }}
                 />
               </label>
+              <label className="header-control-item">
+                <input
+                  type="checkbox"
+                  checked={palmRejection}
+                  onChange={(e) => {
+                    const val = e.target.checked;
+                    setPalmRejection(val);
+                    saveConfigWithLatest({ palmRejection: val });
+                  }}
+                />
+                Palm Rejection
+              </label>
+              {palmRejection && (
+                <label className="header-control-item delay-control">
+                  Palm Delay: <span className="value-display">{palmRejectionDelay}</span>ms
+                  <input
+                    type="range" min="100" max="2000" step="50"
+                    value={palmRejectionDelay}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value);
+                      setPalmRejectionDelay(val);
+                      saveConfigWithLatest({ palmRejectionDelay: val });
+                    }}
+                  />
+                </label>
+              )}
             </div>
             {/* Advanced Settings ボタンは非表示（コードは残しておく）
             <div style={{ marginTop: "10px", textAlign: "right" }}>
