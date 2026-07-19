@@ -9,6 +9,10 @@ use winapi::shared::windef::HWND;
 use winapi::um::libloaderapi::GetModuleHandleW;
 use winapi::um::winuser::*;
 
+use winapi::shared::ntdef::PVOID;
+use winapi::shared::hidpi::*;
+use winapi::shared::minwindef::{ULONG, USHORT, UINT};
+
 #[derive(Clone, Copy)]
 pub struct SendHwnd(pub HWND);
 unsafe impl Send for SendHwnd {}
@@ -77,7 +81,10 @@ pub unsafe extern "system" fn wnd_proc(
                         event_detected = true;
                     }
                 } else if raw.header.dwType == RIM_TYPEHID {
-                    event_detected = true;
+                    let hid = raw.data.hid();
+                    if check_hid_touch(raw.header.hDevice, hid) {
+                        event_detected = true;
+                    }
                 }
 
                 if event_detected {
@@ -186,4 +193,127 @@ pub fn scan_and_register(_state: &MonitorState, hwnd: HWND) {
             crate::audit_log("[MONITOR] Successfully registered Raw Input Devices");
         }
     }
+}
+
+unsafe fn check_hid_touch(device_handle: winapi::shared::ntdef::HANDLE, raw_hid: &RAWHID) -> bool {
+    let mut preparsed_data_size: UINT = 0;
+    if GetRawInputDeviceInfoW(device_handle, RIDI_PREPARSEDDATA, std::ptr::null_mut(), &mut preparsed_data_size) != 0 {
+        return false;
+    }
+    if preparsed_data_size == 0 {
+        return false;
+    }
+
+    let mut preparsed_data = vec![0u8; preparsed_data_size as usize];
+    if GetRawInputDeviceInfoW(
+        device_handle,
+        RIDI_PREPARSEDDATA,
+        preparsed_data.as_mut_ptr() as *mut _,
+        &mut preparsed_data_size,
+    ) == !0
+    {
+        return false;
+    }
+
+    let p_preparsed = preparsed_data.as_mut_ptr() as PVOID;
+    let mut caps: HIDP_CAPS = std::mem::zeroed();
+    if HidP_GetCaps(p_preparsed, &mut caps) != HIDP_STATUS_SUCCESS {
+        return false;
+    }
+
+    let button_caps_length = caps.NumberInputButtonCaps;
+    if button_caps_length == 0 {
+        return false;
+    }
+    let mut button_caps = vec![std::mem::zeroed::<HIDP_BUTTON_CAPS>(); button_caps_length as usize];
+    let mut actual_button_caps_length = button_caps_length;
+    if HidP_GetButtonCaps(
+        HidP_Input,
+        button_caps.as_mut_ptr(),
+        &mut actual_button_caps_length,
+        p_preparsed,
+    ) != HIDP_STATUS_SUCCESS
+    {
+        return false;
+    }
+
+    let report_ptr = &raw_hid.bRawData as *const u8;
+    let report_len = raw_hid.dwSizeHid;
+    let mut touch_detected = false;
+
+    for r in 0..raw_hid.dwCount {
+        let current_report = report_ptr.add((r * report_len) as usize) as *mut u8;
+        let mut nodes_length = caps.NumberLinkCollectionNodes;
+        
+        if nodes_length > 0 {
+            let mut nodes = vec![std::mem::zeroed::<HIDP_LINK_COLLECTION_NODE>(); nodes_length as usize];
+            if HidP_GetLinkCollectionNodes(nodes.as_mut_ptr(), &mut nodes_length, p_preparsed) == HIDP_STATUS_SUCCESS {
+                for collection_id in 1..=nodes_length as USHORT {
+                    let mut ts_len = 1;
+                    let mut ts_usage = [0u16; 1];
+                    let ts_status = HidP_GetUsages(
+                        HidP_Input,
+                        0x0D,
+                        collection_id,
+                        ts_usage.as_mut_ptr(),
+                        &mut ts_len,
+                        p_preparsed,
+                        current_report,
+                        report_len,
+                    );
+                    
+                    let is_tip_active = ts_status == HIDP_STATUS_SUCCESS && ts_len > 0 && ts_usage[0] == 0x42;
+                    
+                    if is_tip_active {
+                        let mut conf_len = 1;
+                        let mut conf_usage = [0u16; 1];
+                        let conf_status = HidP_GetUsages(
+                            HidP_Input,
+                            0x0D,
+                            collection_id,
+                            conf_usage.as_mut_ptr(),
+                            &mut conf_len,
+                            p_preparsed,
+                            current_report,
+                            report_len,
+                        );
+                        
+                        let is_conf_active = conf_status == HIDP_STATUS_SUCCESS && conf_len > 0 && conf_usage[0] == 0x47;
+                        
+                        let has_conf_cap = button_caps.iter().take(actual_button_caps_length as usize).any(|cap| {
+                            cap.UsagePage == 0x0D && cap.LinkCollection == collection_id && 
+                            (cap.IsRange == 0 && cap.u.NotRange().Usage == 0x47)
+                        });
+                        
+                        if !has_conf_cap || is_conf_active {
+                            touch_detected = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        } else {
+            let mut ts_len = 10;
+            let mut ts_usages = vec![0u16; ts_len];
+            let ts_status = HidP_GetUsages(
+                HidP_Input,
+                0x0D,
+                0,
+                ts_usages.as_mut_ptr(),
+                &mut ts_len,
+                p_preparsed,
+                current_report,
+                report_len,
+            );
+            if ts_status == HIDP_STATUS_SUCCESS && ts_len > 0 {
+                touch_detected = true;
+            }
+        }
+        
+        if touch_detected {
+            break;
+        }
+    }
+    
+    touch_detected
 }
