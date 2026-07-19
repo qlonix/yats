@@ -215,7 +215,7 @@ unsafe fn check_hid_touch(device_handle: winapi::shared::ntdef::HANDLE, raw_hid:
         return false;
     }
 
-    let p_preparsed = preparsed_data.as_mut_ptr() as PVOID;
+    let p_preparsed = preparsed_data.as_mut_ptr() as PHIDP_PREPARSED_DATA;
     let mut caps: HIDP_CAPS = std::mem::zeroed();
     if HidP_GetCaps(p_preparsed, &mut caps) != HIDP_STATUS_SUCCESS {
         return false;
@@ -226,7 +226,7 @@ unsafe fn check_hid_touch(device_handle: winapi::shared::ntdef::HANDLE, raw_hid:
         return false;
     }
     let mut button_caps = vec![std::mem::zeroed::<HIDP_BUTTON_CAPS>(); button_caps_length as usize];
-    let mut actual_button_caps_length = button_caps_length;
+    let mut actual_button_caps_length = button_caps_length as ULONG;
     if HidP_GetButtonCaps(
         HidP_Input,
         button_caps.as_mut_ptr(),
@@ -242,14 +242,15 @@ unsafe fn check_hid_touch(device_handle: winapi::shared::ntdef::HANDLE, raw_hid:
     let mut touch_detected = false;
 
     for r in 0..raw_hid.dwCount {
-        let current_report = report_ptr.add((r * report_len) as usize) as *mut u8;
+        let current_report = report_ptr.add((r * report_len) as usize) as *mut i8;
         let mut nodes_length = caps.NumberLinkCollectionNodes;
         
         if nodes_length > 0 {
             let mut nodes = vec![std::mem::zeroed::<HIDP_LINK_COLLECTION_NODE>(); nodes_length as usize];
-            if HidP_GetLinkCollectionNodes(nodes.as_mut_ptr(), &mut nodes_length, p_preparsed) == HIDP_STATUS_SUCCESS {
-                for collection_id in 1..=nodes_length as USHORT {
-                    let mut ts_len = 1;
+            let mut actual_nodes_length = nodes_length as ULONG;
+            if HidP_GetLinkCollectionNodes(nodes.as_mut_ptr(), &mut actual_nodes_length, p_preparsed) == HIDP_STATUS_SUCCESS {
+                for collection_id in 1..=actual_nodes_length as USHORT {
+                    let mut ts_len: ULONG = 1;
                     let mut ts_usage = [0u16; 1];
                     let ts_status = HidP_GetUsages(
                         HidP_Input,
@@ -265,7 +266,7 @@ unsafe fn check_hid_touch(device_handle: winapi::shared::ntdef::HANDLE, raw_hid:
                     let is_tip_active = ts_status == HIDP_STATUS_SUCCESS && ts_len > 0 && ts_usage[0] == 0x42;
                     
                     if is_tip_active {
-                        let mut conf_len = 1;
+                        let mut conf_len: ULONG = 1;
                         let mut conf_usage = [0u16; 1];
                         let conf_status = HidP_GetUsages(
                             HidP_Input,
@@ -293,8 +294,8 @@ unsafe fn check_hid_touch(device_handle: winapi::shared::ntdef::HANDLE, raw_hid:
                 }
             }
         } else {
-            let mut ts_len = 10;
-            let mut ts_usages = vec![0u16; ts_len];
+            let mut ts_len: ULONG = 10;
+            let mut ts_usages = vec![0u16; ts_len as usize];
             let ts_status = HidP_GetUsages(
                 HidP_Input,
                 0x0D,
