@@ -118,20 +118,67 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
     let mut accum_y: i32 = 0;
     let mut _last_dir_y: i32 = 0;
 
+    // Track touch slots and palm state
+    let mut current_slot: usize = 0;
+    let mut slot_is_palm = [false; 16];
+
+    const ABS_MT_SLOT: u16 = 0x2f;
+    const ABS_MT_TOOL_TYPE: u16 = 0x37;
+    const ABS_MT_TRACKING_ID: u16 = 0x39;
+
     loop {
         if let Ok(events) = device.fetch_events() {
             for ev in events {
-                if ev.event_type() == EventType::ABSOLUTE
-                    || ev.event_type() == EventType::RELATIVE
-                    || ev.event_type() == EventType::KEY
+                let ev_type = ev.event_type();
+
+                // Process slot/palm tracking first
+                if ev_type == EventType::ABSOLUTE {
+                    let code = ev.code();
+                    if code == ABS_MT_SLOT {
+                        let slot = ev.value() as usize;
+                        if slot < slot_is_palm.len() {
+                            current_slot = slot;
+                        }
+                    } else if code == ABS_MT_TRACKING_ID {
+                        if ev.value() == -1 {
+                            // Touch released for this slot
+                            if current_slot < slot_is_palm.len() {
+                                slot_is_palm[current_slot] = false;
+                            }
+                        }
+                    } else if code == ABS_MT_TOOL_TYPE {
+                        // MT_TOOL_PALM = 2
+                        if current_slot < slot_is_palm.len() {
+                            slot_is_palm[current_slot] = ev.value() == 2;
+                        }
+                    }
+                }
+
+                if ev_type == EventType::ABSOLUTE
+                    || ev_type == EventType::RELATIVE
+                    || ev_type == EventType::KEY
                 {
-                    state.is_touched.store(true, Ordering::SeqCst);
-                    if let Ok(mut last_time) = state.last_touch_time.lock() {
-                        *last_time = std::time::Instant::now();
+                    // Check if current event is considered a palm touch
+                    let is_palm = if ev_type == EventType::ABSOLUTE {
+                        current_slot < slot_is_palm.len() && slot_is_palm[current_slot]
+                    } else {
+                        // For relative/key events, check if any active slot is marked as palm
+                        slot_is_palm.iter().any(|&p| p)
+                    };
+
+                    if !is_palm {
+                        state.is_touched.store(true, Ordering::SeqCst);
+                        if let Ok(mut last_time) = state.last_touch_time.lock() {
+                            *last_time = std::time::Instant::now();
+                        }
                     }
 
                     // Handle ABSOLUTE axis events
-                    if ev.event_type() == EventType::ABSOLUTE {
+                    if ev_type == EventType::ABSOLUTE {
+                        if is_palm {
+                            continue;
+                        }
+
                         const JUMP_THRESHOLD: i32 = 100;
                         // タッチパッド移動の最小検出閾値（1=即座に反応）
                         const ACCUM_THRESHOLD: i32 = 1;
@@ -198,7 +245,11 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                     }
 
                     // Handle RELATIVE movement
-                    if ev.event_type() == EventType::RELATIVE {
+                    if ev_type == EventType::RELATIVE {
+                        if is_palm {
+                            continue;
+                        }
+
                         match ev.code() {
                             0 => {
                                 // REL_X
@@ -213,7 +264,7 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                     }
 
                     // Reset tracking on finger lift
-                    if ev.event_type() == EventType::KEY && ev.code() == 330 && ev.value() == 0 {
+                    if ev_type == EventType::KEY && ev.code() == 330 && ev.value() == 0 {
                         last_abs_x = None;
                         last_abs_y = None;
                         accum_x = 0;
@@ -222,9 +273,11 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                     }
 
                     // UI Update
-                    if let Ok(h) = state.app_handle.try_lock() {
-                        if let Some(app) = &*h {
-                            let _ = app.emit("touchpad-status", true).ok();
+                    if !is_palm {
+                        if let Ok(h) = state.app_handle.try_lock() {
+                            if let Some(app) = &*h {
+                                let _ = app.emit("touchpad-status", true).ok();
+                            }
                         }
                     }
                 }

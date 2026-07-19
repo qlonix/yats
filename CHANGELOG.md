@@ -5,6 +5,11 @@ All notable changes to YATS (Yet Another Touchpad Shortcut) will be documented i
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.6] - 2026-07-19
+
+### Fixed
+- **Linuxパームリジェクションの改善**: Linux環境（`evdev`）において、手のひら（パーム）がタッチパッドに触れた際に発生するイベント（`ABS_MT_TOOL_TYPE` が `MT_TOOL_PALM` となるスロット）を検知して正しくフィルタリングするようロジックを修正。タイピング中の手のひら接触による意図しないクリック等の誤動作が防止されます。
+
 ## [1.3.5] - 2026-04-29
 
 ### Fixed
