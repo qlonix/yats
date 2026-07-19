@@ -177,6 +177,11 @@ fn deep_registry_clean_cmd() -> Result<String, String> {
     platform::Platform::deep_registry_clean()
 }
 
+#[tauri::command]
+fn get_app_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let pid = std::process::id();
@@ -215,7 +220,8 @@ pub fn run() {
             get_startup_status_cmd,
             get_aap_threshold,
             set_aap_threshold,
-            deep_registry_clean_cmd
+            deep_registry_clean_cmd,
+            get_app_version
         ])
         .setup(move |app| {
             let mut log_dir = app.path().app_log_dir().expect("Failed to get log dir");

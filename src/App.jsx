@@ -428,6 +428,7 @@ function App() {
   const [isTouched, setIsTouched] = useState(false);
   const [releaseDelay, setReleaseDelay] = useState(100);
   const [showAbout, setShowAbout] = useState(false);
+  const [appVersion, setAppVersion] = useState("1.3.7");
   const [listeningForKey, setListeningForKey] = useState(false);
   const [sortField, setSortField] = useState("key");
   const [sortOrder, setSortOrder] = useState("asc");
@@ -521,6 +522,7 @@ function App() {
       listen("pause-status", (event) => setIsPaused(event.payload));
     });
     invoke("get_startup_status_cmd").then(setAutoStart);
+    invoke("get_app_version").then(setAppVersion).catch(console.error);
 
     const interval = setInterval(() => {
       invoke("get_touch_status").then(setIsTouched);
@@ -616,7 +618,7 @@ function App() {
             <h2>About YATS</h2>
             <p><strong>YATS</strong> stands for:</p>
             <p className="yats-full-name">Yet Another Touchpad Shortcut</p>
-            <p className="version-info">Version 1.3.3</p>
+            <p className="version-info">Version {appVersion}</p>
             <button className="btn-close-modal" onClick={() => setShowAbout(false)}>Close</button>
           </div>
         </div>

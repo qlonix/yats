@@ -5,6 +5,11 @@ All notable changes to YATS (Yet Another Touchpad Shortcut) will be documented i
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.7] - 2026-07-19
+
+### Added
+- **Windows版パームリジェクションの改善**: Windows環境において、Raw InputのHID生データ（PTP規格）を解析し、手のひらによる誤操作（Confidenceビットが0のタッチ）を直接判定して除外するロジックを実装。タイピング中などの意図しない手のひら接触によるクリック等の誤動作が防止されます。
+
 ## [1.3.6] - 2026-07-19
 
 ### Fixed
