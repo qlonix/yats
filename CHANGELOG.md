@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.8] - 2026-11-19
+
 ### Added
 - Scroll Tuning のカーブグラフにライブマーカーを追加。モーダルを開いた状態で他のウィンドウでスクロールすると、現在の入力速度とカーブ上の出力位置がリアルタイムで表示される
 
