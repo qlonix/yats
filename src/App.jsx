@@ -440,7 +440,7 @@ function App() {
   const [showScrollTuning, setShowScrollTuning] = useState(false);
   const [scrollInvert, setScrollInvert] = useState(true);
   const [scrollSensitivity, setScrollSensitivity] = useState(1);
-  const [scrollSpeed, setScrollSpeed] = useState(5);
+  const [scrollSpeed, setScrollSpeed] = useState(25);
   const [linuxMinDistance, setLinuxMinDistance] = useState(0);
   const [linuxMinSpeed, setLinuxMinSpeed] = useState(0.0);
   const [linuxMinScrollSpeed, setLinuxMinScrollSpeed] = useState(1);
@@ -499,7 +499,7 @@ function App() {
       setMappings(normalized);
       setReleaseDelay(config.release_delay_ms || 200);
       setScrollSensitivity(config.scroll_sensitivity ?? 1);
-      setScrollSpeed(config.scroll_speed ?? 5);
+      setScrollSpeed(config.scroll_speed ?? 25);
       setScrollInvert(config.scroll_invert ?? true);
       setLinuxMinDistance(config.linux_min_distance ?? 0);
       setLinuxMinSpeed(config.linux_min_speed ?? 0.0);

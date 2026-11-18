@@ -73,7 +73,8 @@ fn default_sensitivity() -> u32 {
 }
 
 fn default_scroll_speed() -> u32 {
-    5
+    // Scroll Speed スライダー（5..50）の中央値。カーブ使用時は 25 を等倍として扱う
+    25
 }
 
 fn default_linux_min_distance() -> i32 {
@@ -153,7 +154,7 @@ impl Default for AppConfig {
             mappings,
             release_delay_ms: 200,
             scroll_sensitivity: 1,
-            scroll_speed: 5,
+            scroll_speed: 25,
             scroll_invert: true,
             linux_min_distance: 0,
             linux_min_speed: 0.0,

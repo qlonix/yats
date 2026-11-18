@@ -1,5 +1,5 @@
-use crate::audit_log;
 use crate::platform::touchpad;
+use crate::{audit_log, lock_unpoison};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
@@ -47,17 +47,23 @@ impl TouchpadMonitor {
         std::thread::Builder::new()
             .name("touchpad-monitor".to_string())
             .spawn(move || {
-                // Wait for LOG_PATH to be initialized
+                // 監査ログの出力先が設定されるまで待つ
                 for _ in 0..50 {
                     std::thread::sleep(std::time::Duration::from_millis(100));
                 }
 
                 audit_log("[MONITOR] Monitor thread started after initialization delay");
 
-                if let Err(e) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    touchpad::run_monitor(state_clone);
-                })) {
-                    audit_log(&format!("[MONITOR] PANIC in monitor thread: {:?}", e));
+                loop {
+                    let state = Arc::clone(&state_clone);
+                    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        touchpad::run_monitor(state);
+                    }));
+                    if result.is_ok() {
+                        break;
+                    }
+                    audit_log("[MONITOR] PANIC in monitor thread; restarting in 2s");
+                    std::thread::sleep(std::time::Duration::from_secs(2));
                 }
             })
             .unwrap_or_else(|e| {
@@ -66,48 +72,59 @@ impl TouchpadMonitor {
             });
 
         let state_watch = Arc::clone(&state);
-        std::thread::spawn(move || loop {
-            std::thread::sleep(std::time::Duration::from_millis(100));
-
-            if let Ok(h) = state_watch.app_handle.try_lock() {
-                if let Some(app) = &*h {
-                    let _ = app.emit("monitor-heartbeat", true).ok();
-
-                    let mut activity = state_watch.device_activity.lock().unwrap();
-
-                    // Periodic cleanup to prevent map bloat
-                    if activity.len() > 50 {
-                        activity.clear();
+        std::thread::Builder::new()
+            .name("monitor-watcher".into())
+            .spawn(move || {
+                let mut ticks = 0;
+                loop {
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                    ticks += 1;
+                    if ticks == 600 {
+                        audit_log("[HEARTBEAT] watcher alive");
+                        ticks = 0;
                     }
 
-                    let mut sorted: Vec<_> = activity.clone().into_iter().collect();
-                    sorted.sort_by(|a, b| b.1.cmp(&a.1));
-                    let top: Vec<String> = sorted
-                        .iter()
-                        .take(5)
-                        .map(|(id, count)| format!("0x{:x} ({})", id, count))
-                        .collect();
-                    let _ = app.emit("top-devices", top).ok();
-                }
-            }
-
-            let last_touch = { *state_watch.last_touch_time.lock().unwrap() };
-            let delay = state_watch.release_delay_ms.load(Ordering::SeqCst) as u64;
-
-            if std::time::Instant::now()
-                .duration_since(last_touch)
-                .as_millis()
-                > delay as u128
-            {
-                if state_watch.is_touched.swap(false, Ordering::SeqCst) {
                     if let Ok(h) = state_watch.app_handle.try_lock() {
                         if let Some(app) = &*h {
-                            let _ = app.emit("touchpad-status", false).ok();
+                            let _ = app.emit("monitor-heartbeat", true).ok();
+
+                            let mut activity = lock_unpoison(&state_watch.device_activity);
+
+                            // デバイスの活動記録が増えすぎないようにする
+                            if activity.len() > 50 {
+                                activity.clear();
+                            }
+
+                            let mut sorted: Vec<_> = activity.clone().into_iter().collect();
+                            sorted.sort_by(|a, b| b.1.cmp(&a.1));
+                            let top: Vec<String> = sorted
+                                .iter()
+                                .take(5)
+                                .map(|(id, count)| format!("0x{:x} ({})", id, count))
+                                .collect();
+                            let _ = app.emit("top-devices", top).ok();
+                        }
+                    }
+
+                    let last_touch = { *lock_unpoison(&state_watch.last_touch_time) };
+                    let delay = state_watch.release_delay_ms.load(Ordering::SeqCst) as u64;
+
+                    if std::time::Instant::now()
+                        .duration_since(last_touch)
+                        .as_millis()
+                        > delay as u128
+                    {
+                        if state_watch.is_touched.swap(false, Ordering::SeqCst) {
+                            if let Ok(h) = state_watch.app_handle.try_lock() {
+                                if let Some(app) = &*h {
+                                    let _ = app.emit("touchpad-status", false).ok();
+                                }
+                            }
                         }
                     }
                 }
-            }
-        });
+            })
+            .expect("Failed to spawn monitor watcher thread");
 
         Self { state }
     }
@@ -115,7 +132,7 @@ impl TouchpadMonitor {
     pub fn scan_and_register(&self) {
         #[cfg(target_os = "windows")]
         {
-            let hwnd_wrapped = { *self.state.hwnd.lock().unwrap() };
+            let hwnd_wrapped = { *lock_unpoison(&self.state.hwnd) };
             if let Some(hwnd) = hwnd_wrapped {
                 touchpad::scan_and_register(&self.state, hwnd.0);
             }
@@ -128,7 +145,7 @@ impl TouchpadMonitor {
     }
 
     pub fn lock_device(&self, device_id: Option<usize>) {
-        *self.state.locked_device.lock().unwrap() = device_id;
+        *lock_unpoison(&self.state.locked_device) = device_id;
         audit_log(&format!("[MONITOR] Locked to device: {:?}", device_id));
     }
 

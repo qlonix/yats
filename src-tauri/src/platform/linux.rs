@@ -1,7 +1,7 @@
 // Linux-specific platform implementations
 
 use crate::config::{MouseButton, WindowAction};
-use enigo::{Button, Direction, Enigo, Mouse, Settings};
+use enigo::{Axis, Button, Direction, Enigo, Key, Keyboard, Mouse, Settings};
 
 pub struct LinuxPlatform;
 
@@ -23,33 +23,35 @@ impl super::InputSimulation for LinuxPlatform {
     }
 
     fn send_key_click(vk: u16, pressed: bool) {
-        use rdev::{simulate, EventType, Key};
-        let keys = match vk {
-            0xA6 => vec![Key::Alt, Key::LeftArrow],  // Browser Back
-            0xA7 => vec![Key::Alt, Key::RightArrow], // Browser Forward
+        let arrow = match vk {
+            0xA6 => Key::LeftArrow,
+            0xA7 => Key::RightArrow,
             _ => return,
         };
-        if pressed {
-            for &k in &keys {
-                let _ = simulate(&EventType::KeyPress(k));
-            }
-        } else {
-            for &k in keys.iter().rev() {
-                let _ = simulate(&EventType::KeyRelease(k));
+        // 解放イベントが届くまでキーの押下状態を維持する。
+        let settings = Settings {
+            release_keys_when_dropped: false,
+            ..Settings::default()
+        };
+        if let Ok(mut enigo) = Enigo::new(&settings) {
+            if pressed {
+                let _ = enigo.key(Key::Alt, Direction::Press);
+                let _ = enigo.key(arrow, Direction::Press);
+            } else {
+                let _ = enigo.key(arrow, Direction::Release);
+                let _ = enigo.key(Key::Alt, Direction::Release);
             }
         }
     }
 
     fn send_mouse_scroll(delta: i32) {
-        use rdev::{simulate, EventType};
-
-        // keyboard_hook 側の accumulator で既にスケーリング済み
-        // ここでは受け取った delta をそのまま Wheel イベントとして送信する
-        if delta != 0 {
-            let _ = simulate(&EventType::Wheel {
-                delta_x: 0,
-                delta_y: delta as i64,
-            });
+        if delta == 0 {
+            return;
+        }
+        if let Ok(mut enigo) = Enigo::new(&Settings::default()) {
+            // enigo の正方向は下（ボタン5）、従来の rdev の正方向は上（ボタン4）。
+            // 従来と同じ方向にスクロールするよう符号を反転する。
+            let _ = enigo.scroll(delta.saturating_neg(), Axis::Vertical);
         }
     }
 }

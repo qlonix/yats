@@ -1,6 +1,6 @@
 use crate::config::{Action, AppConfig, ScrollConfig};
-use crate::platform;
 use crate::touchpad_monitor::TouchpadMonitor;
+use crate::{lock_unpoison, platform, read_unpoison};
 use rdev::{simulate, EventType};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -83,8 +83,7 @@ pub struct HookWorker {
     config: Arc<RwLock<AppConfig>>,
     scroll_anchor: Option<(i32, i32)>,
     accumulator_y: f32,
-    total_movement_y: f32,
-    is_scrolling: bool,
+    pending_y: f32,
     last_scroll_time: std::time::Instant,
 }
 
@@ -101,8 +100,7 @@ impl HookWorker {
             config,
             scroll_anchor: None,
             accumulator_y: 0.0,
-            total_movement_y: 0.0,
-            is_scrolling: false,
+            pending_y: 0.0,
             last_scroll_time: std::time::Instant::now(),
         }
     }
@@ -121,112 +119,38 @@ impl HookWorker {
                         } else {
                             self.scroll_anchor = None;
                         }
-                        self.total_movement_y = 0.0;
-                        self.is_scrolling = false;
                         self.accumulator_y = 0.0;
+                        self.pending_y = 0.0;
+                        self.last_scroll_time = std::time::Instant::now();
                     }
                 }
             }
 
-            if let Some(_cfg) = &self.active_scroll {
+            if let Some(key_cfg) = &self.active_scroll {
                 if let Some((x, y)) = self.scroll_anchor {
                     platform::set_cursor_pos(x, y);
                 }
 
-                let raw_delta = self.monitor.consume_y_delta();
-                // Batching dispatcher
+                self.pending_y += self.monitor.consume_y_delta() as f32;
                 let now = std::time::Instant::now();
-                let _dt = now.duration_since(self.last_scroll_time).as_secs_f32();
-
-                if raw_delta != 0 {
-                    let (
-                        global_sens,
-                        global_invert,
-                        global_speed,
-                        _min_dist,
-                        _min_speed,
-                        _min_scroll,
-                        _max_scroll,
-                        _use_curve,
-                        _curve,
-                    ) = {
-                        let cfg_lock = self.config.read().unwrap();
-                        (
-                            cfg_lock.scroll_sensitivity,
-                            cfg_lock.scroll_invert,
-                            cfg_lock.scroll_speed,
-                            cfg_lock.linux_min_distance,
-                            cfg_lock.linux_min_speed,
-                            cfg_lock.linux_min_scroll_speed,
-                            cfg_lock.linux_max_scroll_speed,
-                            cfg_lock.linux_use_scroll_curve,
-                            cfg_lock.linux_scroll_curve.clone(),
-                        )
-                    };
-
-                    let mut delta = raw_delta as f32;
-                    if global_invert {
-                        delta = -delta;
+                let interval = now.duration_since(self.last_scroll_time);
+                if interval >= std::time::Duration::from_millis(8) {
+                    if self.pending_y != 0.0 {
+                        let cfg = read_unpoison(&self.config);
+                        self.accumulator_y += compute_scroll_addition(
+                            self.pending_y,
+                            interval.as_secs_f32().max(0.001),
+                            cfg.scroll_sensitivity,
+                            cfg.scroll_invert,
+                            cfg.scroll_speed,
+                            cfg.linux_min_scroll_speed,
+                            cfg.linux_max_scroll_speed,
+                            cfg.linux_use_scroll_curve,
+                            &cfg.linux_scroll_curve,
+                            key_cfg,
+                        );
                     }
-
-                    #[cfg(target_os = "linux")]
-                    {
-                        self.total_movement_y += delta;
-                        let _current_speed = (delta / _dt).abs();
-
-                        // デッドゾーンを廃止: マウス移動が検出された時点で即座にスクロール開始
-                        // _min_dist / _min_speed は参照のみ維持（コンパイラ警告回避）
-                        let _ = (_min_dist, _min_speed);
-                        self.is_scrolling = true;
-                    }
-
-                    #[cfg(not(target_os = "linux"))]
-                    {
-                        self.is_scrolling = true;
-                    }
-
-                    if self.is_scrolling {
-                        let gain = (global_sens as f32) / 100.0;
-                        let speed = (global_speed as f32) / 100.0;
-
-                        // Linux: send_mouse_scroll は直接パススルーなのでスケール不要
-                        // Windows: 従来通り LINEAR_SCALE=40 を維持
-                        #[cfg(target_os = "linux")]
-                        const LINEAR_SCALE: f32 = 1.0;
-                        #[cfg(not(target_os = "linux"))]
-                        const LINEAR_SCALE: f32 = 40.0;
-
-                        #[cfg(target_os = "linux")]
-                        let addition = {
-                            if _use_curve && !_curve.is_empty() {
-                                // Curve based scaling
-                                let input_speed = (delta / _dt).abs();
-                                let output_speed = interpolate_curve(&_curve, input_speed);
-
-                                // output_total = output_speed * dt
-                                // Maintain direction
-                                delta.signum() * output_speed * _dt
-                            } else {
-                                // Linear based scaling (existing logic)
-                                let mut temp_addition = delta * gain * speed * LINEAR_SCALE;
-                                let current_out_speed = temp_addition.abs() / 0.008;
-                                if current_out_speed < _min_scroll && current_out_speed > 0.0 {
-                                    temp_addition = temp_addition.signum() * _min_scroll * 0.008;
-                                } else if current_out_speed > _max_scroll {
-                                    temp_addition = temp_addition.signum() * _max_scroll * 0.008;
-                                }
-                                temp_addition
-                            }
-                        };
-
-                        #[cfg(not(target_os = "linux"))]
-                        let addition = delta * gain * speed * LINEAR_SCALE;
-
-                        self.accumulator_y += addition;
-                    }
-                }
-
-                if now.duration_since(self.last_scroll_time).as_millis() >= 8 {
+                    self.pending_y = 0.0;
                     let output = self.accumulator_y.trunc() as i32;
                     if output != 0 {
                         platform::send_mouse_scroll(output);
@@ -238,6 +162,7 @@ impl HookWorker {
                 self.monitor.consume_x_delta();
                 self.monitor.consume_y_delta();
                 self.accumulator_y = 0.0;
+                self.pending_y = 0.0;
             }
 
             std::thread::sleep(std::time::Duration::from_millis(1));
@@ -254,10 +179,13 @@ impl KeyboardHook {
         let (tx, rx) = channel();
         let mon_clone = Arc::clone(&monitor);
         let cfg_clone = Arc::clone(&config);
-        std::thread::spawn(move || {
-            let mut worker = HookWorker::new(rx, mon_clone, cfg_clone);
-            worker.run();
-        });
+        std::thread::Builder::new()
+            .name("hook-worker".into())
+            .spawn(move || {
+                let mut worker = HookWorker::new(rx, mon_clone, cfg_clone);
+                worker.run();
+            })
+            .expect("Failed to spawn hook worker thread");
 
         Self {
             monitor,
@@ -291,17 +219,18 @@ impl KeyboardHook {
 
                     match event.event_type {
                         rdev::EventType::KeyPress(key) => {
-                            let mut keys = pressed_keys.lock().unwrap();
+                            let mut keys = lock_unpoison(&pressed_keys);
                             if keys.contains(&key) {
                                 return None;
                             }
 
                             let now = std::time::Instant::now();
                             let is_palm_rejected = {
-                                let cfg = config_inner.read().unwrap();
+                                let cfg = read_unpoison(&config_inner);
                                 if cfg.palm_rejection {
-                                    if let Some(last_time) = *last_typing_inner.lock().unwrap() {
-                                        now.duration_since(last_time).as_millis() < cfg.palm_rejection_delay_ms as u128
+                                    if let Some(last_time) = *lock_unpoison(&last_typing_inner) {
+                                        now.duration_since(last_time).as_millis()
+                                            < cfg.palm_rejection_delay_ms as u128
                                     } else {
                                         false
                                     }
@@ -312,7 +241,7 @@ impl KeyboardHook {
 
                             let touched = monitor_inner.is_touched();
                             let action = {
-                                let cfg = config_inner.read().unwrap();
+                                let cfg = read_unpoison(&config_inner);
                                 cfg.mappings.get(&key).cloned()
                             };
 
@@ -324,28 +253,30 @@ impl KeyboardHook {
                                     match action {
                                         Action::MouseScroll(cfg) => {
                                             monitor_inner.consume_y_delta();
-                                            let _ =
-                                                tx_inner.send(RemapCommand::UpdateScroll(Some(cfg)));
+                                            let _ = tx_inner
+                                                .send(RemapCommand::UpdateScroll(Some(cfg)));
                                         }
                                         _ => {
-                                            let _ = tx_inner.send(RemapCommand::Execute(action, true));
+                                            let _ =
+                                                tx_inner.send(RemapCommand::Execute(action, true));
                                         }
                                     }
                                     return None;
                                 }
                             } else {
-                                *last_typing_inner.lock().unwrap() = Some(now);
+                                *lock_unpoison(&last_typing_inner) = Some(now);
                             }
                         }
                         rdev::EventType::KeyRelease(key) => {
-                            let mut keys = pressed_keys.lock().unwrap();
+                            let mut keys = lock_unpoison(&pressed_keys);
                             if !keys.remove(&key) {
-                                *last_typing_inner.lock().unwrap() = Some(std::time::Instant::now());
+                                *lock_unpoison(&last_typing_inner) =
+                                    Some(std::time::Instant::now());
                                 return Some(event);
                             }
 
                             let action = {
-                                let cfg = config_inner.read().unwrap();
+                                let cfg = read_unpoison(&config_inner);
                                 cfg.mappings.get(&key).cloned()
                             };
 
@@ -428,7 +359,7 @@ impl KeyboardHook {
                 }
 
                 // Create a single virtual uinput device for all keyboards
-                let mut uinput_builder = match evdev::uinput::VirtualDeviceBuilder::new() {
+                let uinput_builder = match evdev::uinput::VirtualDeviceBuilder::new() {
                     Ok(builder) => builder.name("YATS Virtual Keyboard"),
                     Err(e) => {
                         crate::audit_log(&format!(
@@ -453,9 +384,17 @@ impl KeyboardHook {
                     }
                 }
 
-                uinput_builder = uinput_builder
-                    .with_keys(&keys)
-                    .expect("Failed to add keys to uinput builder");
+                let uinput_builder = match uinput_builder.with_keys(&keys) {
+                    Ok(builder) => builder,
+                    Err(e) => {
+                        crate::audit_log(&format!(
+                            "[HOOK] Failed to add keys to uinput builder: {e}"
+                        ));
+                        drop(devices);
+                        std::thread::sleep(std::time::Duration::from_secs(5));
+                        continue;
+                    }
+                };
 
                 let virtual_device = match uinput_builder.build() {
                     Ok(dev) => dev,
@@ -498,10 +437,15 @@ impl KeyboardHook {
                                                 // Press
                                                 let now = std::time::Instant::now();
                                                 let is_palm_rejected = {
-                                                    let cfg = config_inner.read().unwrap();
+                                                    let cfg = read_unpoison(&config_inner);
                                                     if cfg.palm_rejection {
-                                                        if let Some(last_time) = *last_typing_inner.lock().unwrap() {
-                                                            now.duration_since(last_time).as_millis() < cfg.palm_rejection_delay_ms as u128
+                                                        if let Some(last_time) =
+                                                            *lock_unpoison(&last_typing_inner)
+                                                        {
+                                                            now.duration_since(last_time)
+                                                                .as_millis()
+                                                                < cfg.palm_rejection_delay_ms
+                                                                    as u128
                                                         } else {
                                                             false
                                                         }
@@ -511,19 +455,24 @@ impl KeyboardHook {
                                                 };
 
                                                 let is_remap = {
-                                                    let cfg = config_inner.read().unwrap();
+                                                    let cfg = read_unpoison(&config_inner);
                                                     cfg.mappings.contains_key(&rkey)
                                                 };
 
                                                 let touched = monitor_inner.is_touched();
                                                 let paused = IS_PAUSED.load(Ordering::SeqCst);
-                                                let simulating = IS_SIMULATING.load(Ordering::SeqCst);
+                                                let simulating =
+                                                    IS_SIMULATING.load(Ordering::SeqCst);
 
-                                                let should_trigger = is_remap && touched && !paused && !simulating && !is_palm_rejected;
+                                                let should_trigger = is_remap
+                                                    && touched
+                                                    && !paused
+                                                    && !simulating
+                                                    && !is_palm_rejected;
 
                                                 if should_trigger {
                                                     let action = {
-                                                        let cfg = config_inner.read().unwrap();
+                                                        let cfg = read_unpoison(&config_inner);
                                                         cfg.mappings.get(&rkey).cloned()
                                                     };
                                                     if let Some(action) = action {
@@ -532,14 +481,16 @@ impl KeyboardHook {
                                                             Action::MouseScroll(cfg) => {
                                                                 monitor_inner.consume_y_delta();
                                                                 let _ = tx_inner.send(
-                                                                    RemapCommand::UpdateScroll(Some(
-                                                                        cfg,
-                                                                    )),
+                                                                    RemapCommand::UpdateScroll(
+                                                                        Some(cfg),
+                                                                    ),
                                                                 );
                                                             }
                                                             _ => {
                                                                 let _ = tx_inner.send(
-                                                                    RemapCommand::Execute(action, true),
+                                                                    RemapCommand::Execute(
+                                                                        action, true,
+                                                                    ),
                                                                 );
                                                             }
                                                         }
@@ -547,7 +498,7 @@ impl KeyboardHook {
                                                         continue;
                                                     }
                                                 } else {
-                                                    *last_typing_inner.lock().unwrap() = Some(now);
+                                                    *lock_unpoison(&last_typing_inner) = Some(now);
                                                 }
                                             }
                                             0 => {
@@ -570,7 +521,8 @@ impl KeyboardHook {
                                                     // Consume event (do not pass through)
                                                     continue;
                                                 } else {
-                                                    *last_typing_inner.lock().unwrap() = Some(std::time::Instant::now());
+                                                    *lock_unpoison(&last_typing_inner) =
+                                                        Some(std::time::Instant::now());
                                                 }
                                             }
                                             2 => {
@@ -579,7 +531,8 @@ impl KeyboardHook {
                                                     // Consume event (do not pass through)
                                                     continue;
                                                 } else {
-                                                    *last_typing_inner.lock().unwrap() = Some(std::time::Instant::now());
+                                                    *lock_unpoison(&last_typing_inner) =
+                                                        Some(std::time::Instant::now());
                                                 }
                                             }
                                             _ => {}
@@ -587,7 +540,7 @@ impl KeyboardHook {
                                     }
                                 }
                                 // Forward to virtual device
-                                let mut v = v_dev.lock().unwrap();
+                                let mut v = lock_unpoison(&v_dev);
                                 let _ = v.emit(&[ev]);
                             }
                         }
@@ -604,23 +557,84 @@ impl KeyboardHook {
     }
 }
 
-#[cfg(target_os = "linux")]
-fn interpolate_curve(curve: &[(f32, f32)], input: f32) -> f32 {
-    if curve.is_empty() {
-        return input;
+fn compute_scroll_addition(
+    pending_y: f32,
+    elapsed: f32,
+    global_sens: u32,
+    global_invert: bool,
+    global_speed: u32,
+    min_out: f32,
+    max_out: f32,
+    use_curve: bool,
+    curve: &[(f32, f32)],
+    key_cfg: &ScrollConfig,
+) -> f32 {
+    let invert = global_invert ^ key_cfg.invert;
+    let signed = if invert { -pending_y } else { pending_y };
+    if signed == 0.0 {
+        return 0.0;
     }
-    if curve.len() == 1 {
-        return curve[0].1;
+    let key_mult = key_cfg.sensitivity as f32 / 100.0;
+
+    if use_curve
+        && curve
+            .iter()
+            .filter(|(x, y)| x.is_finite() && y.is_finite())
+            .take(2)
+            .count()
+            == 2
+    {
+        let input_speed = signed.abs() / elapsed;
+        // カーブ使用時は Scroll Speed の 25（表示 50%）を等倍とする。
+        let speed_mult = global_speed as f32 / 25.0;
+        let mut output_speed = interpolate_curve(curve, input_speed) * speed_mult * key_mult;
+        // Min/Max は倍率適用後の最終出力速度に対する制限とする。
+        if max_out > 0.0 && output_speed > max_out {
+            output_speed = max_out;
+        }
+        if min_out > 0.0 && output_speed > 0.0 && output_speed < min_out {
+            output_speed = min_out;
+        }
+        return signed.signum() * output_speed * elapsed;
     }
 
-    // Monotone Cubic Spline (Fritsch-Carlson)
-    let n = curve.len();
-    let mut x = Vec::with_capacity(n);
-    let mut y = Vec::with_capacity(n);
-    for p in curve {
-        x.push(p.0);
-        y.push(p.1);
+    #[cfg(target_os = "linux")]
+    const LINEAR_SCALE: f32 = 1.0;
+    #[cfg(not(target_os = "linux"))]
+    const LINEAR_SCALE: f32 = 40.0;
+
+    let gain = global_sens as f32 / 100.0;
+    let speed = global_speed as f32 / 100.0;
+    let mut addition = signed * gain * speed * LINEAR_SCALE * key_mult;
+    if addition != 0.0 {
+        let output_speed = addition.abs() / elapsed;
+        if max_out > 0.0 && output_speed > max_out {
+            addition = addition.signum() * max_out * elapsed;
+        } else if min_out > 0.0 && output_speed < min_out {
+            addition = addition.signum() * min_out * elapsed;
+        }
     }
+    addition
+}
+
+fn interpolate_curve(curve: &[(f32, f32)], input: f32) -> f32 {
+    let mut points: Vec<_> = curve
+        .iter()
+        .copied()
+        .filter(|(x, y)| x.is_finite() && y.is_finite())
+        .collect();
+    points.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    points.dedup_by(|next, prev| next.0 - prev.0 < 0.001);
+
+    match points.as_slice() {
+        [] => return input,
+        [(_, y)] => return *y,
+        _ => {}
+    }
+
+    // Fritsch–Carlson 法による単調三次スプライン補間
+    let n = points.len();
+    let (x, y): (Vec<_>, Vec<_>) = points.into_iter().unzip();
 
     if input <= x[0] {
         return y[0];
@@ -629,7 +643,7 @@ fn interpolate_curve(curve: &[(f32, f32)], input: f32) -> f32 {
         return y[n - 1];
     }
 
-    // Secants and slopes
+    // 区間の割線勾配と各点の接線勾配を求める
     let mut d = Vec::with_capacity(n - 1);
     for i in 0..n - 1 {
         d.push((y[i + 1] - y[i]) / (x[i + 1] - x[i]));
@@ -642,7 +656,7 @@ fn interpolate_curve(curve: &[(f32, f32)], input: f32) -> f32 {
     }
     m[n - 1] = d[n - 2];
 
-    // Monotonicity adjustment
+    // 単調性を保つように接線勾配を調整する
     for i in 0..n - 1 {
         if d[i] == 0.0 {
             m[i] = 0.0;
@@ -659,15 +673,16 @@ fn interpolate_curve(curve: &[(f32, f32)], input: f32) -> f32 {
         }
     }
 
-    // Interpolation
+    // 入力を含む区間で補間する
     for i in 0..n - 1 {
-        if input >= x[i] && input <= x[i + 1] {
-            let h = x[i + 1] - x[i];
+        let h = x[i + 1] - x[i];
+        if h >= 0.001 && input >= x[i] && input <= x[i + 1] {
             let t = (input - x[i]) / h;
-            return y[i] * (1.0 + 2.0 * t) * (1.0 - t).powi(2)
+            let output = y[i] * (1.0 + 2.0 * t) * (1.0 - t).powi(2)
                 + h * m[i] * t * (1.0 - t).powi(2)
                 + y[i + 1] * t.powi(2) * (3.0 - 2.0 * t)
                 + h * m[i + 1] * t.powi(2) * (t - 1.0);
+            return if output.is_finite() { output } else { y[n - 1] };
         }
     }
 
@@ -752,5 +767,64 @@ fn evdev_to_rdev_key(code: u16) -> Option<rdev::Key> {
         125 => Some(Key::MetaLeft),
         126 => Some(Key::MetaRight),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn key_cfg(invert: bool) -> ScrollConfig {
+        ScrollConfig {
+            sensitivity: 100,
+            invert,
+            acceleration: false,
+        }
+    }
+
+    #[test]
+    fn curve_output_scales_with_elapsed() {
+        // 入力速度 2000（16 / 0.008秒）→ カーブ出力 80/s → 0.64 ノッチ
+        let curve = vec![(0.0, 0.0), (2000.0, 80.0)];
+        let addition = compute_scroll_addition(
+            16.0, 0.008, 1, false, 25, 0.0, 0.0, true, &curve, &key_cfg(false),
+        );
+        assert!((addition - 0.64).abs() < 0.01, "addition={addition}");
+    }
+
+    #[test]
+    fn invert_is_xor_of_global_and_key() {
+        let curve = vec![(0.0, 0.0), (2000.0, 80.0)];
+        let base = compute_scroll_addition(
+            16.0, 0.008, 1, false, 25, 0.0, 0.0, true, &curve, &key_cfg(false),
+        );
+        let global_only = compute_scroll_addition(
+            16.0, 0.008, 1, true, 25, 0.0, 0.0, true, &curve, &key_cfg(false),
+        );
+        let both = compute_scroll_addition(
+            16.0, 0.008, 1, true, 25, 0.0, 0.0, true, &curve, &key_cfg(true),
+        );
+        assert!(base > 0.0);
+        assert_eq!(global_only, -base);
+        assert_eq!(both, base);
+    }
+
+    #[test]
+    fn max_clamp_applies_after_speed_multiplier() {
+        // Scroll Speed 50 で倍率は 2 倍になるが、Max=100/s で頭打ちになる
+        let curve = vec![(0.0, 0.0), (2000.0, 80.0)];
+        let addition = compute_scroll_addition(
+            16.0, 0.008, 1, false, 50, 0.0, 100.0, true, &curve, &key_cfg(false),
+        );
+        assert!((addition - 0.8).abs() < 0.01, "addition={addition}");
+    }
+
+    #[test]
+    fn duplicate_x_points_do_not_produce_nan() {
+        let curve = vec![(0.0, 1.0), (100.0, 2.0), (100.0, 3.0), (200.0, 4.0)];
+        let addition = compute_scroll_addition(
+            1.2, 0.008, 1, false, 25, 0.0, 0.0, true, &curve, &key_cfg(false),
+        );
+        assert!(addition.is_finite(), "addition={addition}");
     }
 }

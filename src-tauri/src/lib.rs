@@ -12,7 +12,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::sync::mpsc::{channel, Sender};
-use std::sync::{Arc, Mutex, OnceLock, RwLock};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, TrayIconBuilder, TrayIconEvent},
@@ -22,6 +22,18 @@ use tauri::{
 static LOG_PATH: OnceLock<PathBuf> = OnceLock::new();
 static LOG_TX: OnceLock<Sender<String>> = OnceLock::new();
 static PAUSE_MENU_ITEM: OnceLock<MenuItem<tauri::Wry>> = OnceLock::new();
+
+pub(crate) fn lock_unpoison<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+pub(crate) fn read_unpoison<T>(l: &RwLock<T>) -> RwLockReadGuard<'_, T> {
+    l.read().unwrap_or_else(|e| e.into_inner())
+}
+
+pub(crate) fn write_unpoison<T>(l: &RwLock<T>) -> RwLockWriteGuard<'_, T> {
+    l.write().unwrap_or_else(|e| e.into_inner())
+}
 
 pub fn audit_log(msg: &str) {
     if let Some(tx) = LOG_TX.get() {
@@ -53,7 +65,7 @@ fn start_audit_worker() {
 
 #[tauri::command]
 fn get_config(config: tauri::State<'_, Arc<RwLock<AppConfig>>>) -> AppConfig {
-    config.read().unwrap().clone()
+    read_unpoison(&config).clone()
 }
 
 #[tauri::command]
@@ -70,7 +82,7 @@ fn set_config(
         new_config.scroll_invert,
         new_config.mappings.len()
     ));
-    *config.write().unwrap() = new_config.clone();
+    *write_unpoison(&config) = new_config.clone();
 
     monitor
         .state
@@ -184,6 +196,24 @@ fn get_app_version() -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    std::panic::set_hook(Box::new(|info| {
+        let thread = std::thread::current();
+        let name = thread.name().unwrap_or("<unnamed>");
+        let location = info.location().map_or_else(
+            || "<unknown>".to_string(),
+            |loc| format!("{}:{}:{}", loc.file(), loc.line(), loc.column()),
+        );
+        let payload = info.payload();
+        let msg = payload
+            .downcast_ref::<&str>()
+            .copied()
+            .or_else(|| payload.downcast_ref::<String>().map(String::as_str))
+            .unwrap_or("Box<dyn Any>");
+        let entry = format!("[PANIC] thread={name} at {location}: {msg}");
+        audit_log(&entry);
+        eprintln!("{entry}");
+    }));
+
     let pid = std::process::id();
     let config = Arc::new(RwLock::new(AppConfig::default()));
     let config_clone = Arc::clone(&config);
@@ -237,7 +267,7 @@ pub fn run() {
             ));
 
             let loaded_config = {
-                let mut config_write = config.write().unwrap();
+                let mut config_write = write_unpoison(&config);
                 let cfg = AppConfig::load(app.handle().clone());
                 *config_write = cfg.clone();
                 cfg
@@ -248,7 +278,7 @@ pub fn run() {
                 .release_delay_ms
                 .store(loaded_config.release_delay_ms as u32, Ordering::SeqCst);
 
-            *shared_handle.lock().unwrap() = Some(app.handle().clone());
+            *lock_unpoison(&shared_handle) = Some(app.handle().clone());
 
             let quit_i = MenuItem::with_id(app, "quit", "終了", true, None::<&str>)?;
             let settings_i = MenuItem::with_id(app, "settings", "設定", true, None::<&str>)?;
@@ -308,10 +338,12 @@ pub fn run() {
 
             monitor_clone.scan_and_register();
 
-            std::thread::spawn(move || {
-                let hook = KeyboardHook::new(monitor_clone, config_clone, shared_handle_clone);
-                hook.start();
-            });
+            std::thread::Builder::new()
+                .name("keyboard-hook".into())
+                .spawn(move || {
+                    let hook = KeyboardHook::new(monitor_clone, config_clone, shared_handle_clone);
+                    hook.start();
+                })?;
 
             Ok(())
         })
