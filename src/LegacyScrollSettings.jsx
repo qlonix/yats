@@ -8,11 +8,8 @@ const LegacyScrollSettings = ({
     saveConfigWithLatest,
     scrollSpeed,
     setScrollSpeed,
-    linuxMinSpeed,
-    setLinuxMinSpeed,
     scrollInvert,
     setScrollInvert,
-    linuxMinDistance,
     linuxMinScrollSpeed,
     linuxMaxScrollSpeed,
     linuxScrollCurve
@@ -26,8 +23,6 @@ const LegacyScrollSettings = ({
             scroll_sensitivity: scrollSensitivity,
             scroll_speed: scrollSpeed,
             scroll_invert: scrollInvert,
-            linux_min_distance: linuxMinDistance,
-            linux_min_speed: linuxMinSpeed,
             linux_min_scroll_speed: linuxMinScrollSpeed,
             linux_max_scroll_speed: linuxMaxScrollSpeed,
             linux_scroll_curve: linuxScrollCurve
@@ -89,26 +84,6 @@ const LegacyScrollSettings = ({
                         />
                         <p style={{ fontSize: "0.75rem", color: "#555", marginTop: "8px" }}>
                             * Base scroll speed multiplier. (10% - 100%)
-                        </p>
-                    </div>
-
-                    {/* Linux Min Mouse Speed */}
-                    <div style={{ marginTop: "20px" }}>
-                        <label style={{ display: "block", marginBottom: "8px", fontSize: "0.9rem", color: "#888" }}>
-                            Min Mouse Speed (Linux): <span className="value-display" style={{ fontSize: "1.1rem" }}>{linuxMinSpeed}</span> px/s
-                        </label>
-                        <input
-                            type="range" min="0" max="500" step="5"
-                            style={{ width: "100%", height: "6px", accentColor: "#00d2ff" }}
-                            value={linuxMinSpeed}
-                            onChange={(e) => {
-                                const val = parseFloat(e.target.value);
-                                setLinuxMinSpeed(val);
-                                saveConfigWithLatest({ linuxMinSpeed: val });
-                            }}
-                        />
-                        <p style={{ fontSize: "0.75rem", color: "#555", marginTop: "8px" }}>
-                            * Minimum physical mouse speed required to trigger scroll.
                         </p>
                     </div>
 

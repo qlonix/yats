@@ -50,10 +50,6 @@ pub struct AppConfig {
     pub scroll_speed: u32,
     #[serde(default)]
     pub scroll_invert: bool,
-    #[serde(default = "default_linux_min_distance")]
-    pub linux_min_distance: i32,
-    #[serde(default = "default_linux_min_speed")]
-    pub linux_min_speed: f32,
     #[serde(default = "default_linux_min_scroll_speed")]
     pub linux_min_scroll_speed: f32,
     #[serde(default = "default_linux_max_scroll_speed")]
@@ -75,14 +71,6 @@ fn default_sensitivity() -> u32 {
 fn default_scroll_speed() -> u32 {
     // Scroll Speed スライダー（5..50）の中央値。カーブ使用時は 25 を等倍として扱う
     25
-}
-
-fn default_linux_min_distance() -> i32 {
-    0
-}
-
-fn default_linux_min_speed() -> f32 {
-    0.0
 }
 
 fn default_linux_min_scroll_speed() -> f32 {
@@ -156,8 +144,6 @@ impl Default for AppConfig {
             scroll_sensitivity: 1,
             scroll_speed: 25,
             scroll_invert: true,
-            linux_min_distance: 0,
-            linux_min_speed: 0.0,
             linux_min_scroll_speed: 1.0,
             linux_max_scroll_speed: 100.0,
             linux_use_scroll_curve: true,

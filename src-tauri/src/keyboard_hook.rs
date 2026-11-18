@@ -587,14 +587,7 @@ fn compute_scroll_addition(
         let input_speed = signed.abs() / elapsed;
         // カーブ使用時は Scroll Speed の 25（表示 50%）を等倍とする。
         let speed_mult = global_speed as f32 / 25.0;
-        let mut output_speed = interpolate_curve(curve, input_speed) * speed_mult * key_mult;
-        // Min/Max は倍率適用後の最終出力速度に対する制限とする。
-        if max_out > 0.0 && output_speed > max_out {
-            output_speed = max_out;
-        }
-        if min_out > 0.0 && output_speed > 0.0 && output_speed < min_out {
-            output_speed = min_out;
-        }
+        let output_speed = interpolate_curve(curve, input_speed) * speed_mult * key_mult;
         return signed.signum() * output_speed * elapsed;
     }
 
@@ -810,11 +803,19 @@ mod tests {
     }
 
     #[test]
-    fn max_clamp_applies_after_speed_multiplier() {
-        // Scroll Speed 50 で倍率は 2 倍になるが、Max=100/s で頭打ちになる
+    fn curve_output_is_not_clamped_after_speed_multiplier() {
+        // Scroll Speed 50 で出力は 2 倍の 160/s になり、Max=100/s を超える
         let curve = vec![(0.0, 0.0), (2000.0, 80.0)];
         let addition = compute_scroll_addition(
             16.0, 0.008, 1, false, 50, 0.0, 100.0, true, &curve, &key_cfg(false),
+        );
+        assert!((addition - 1.28).abs() < 0.01, "addition={addition}");
+    }
+
+    #[test]
+    fn linear_output_is_clamped_to_max_speed() {
+        let addition = compute_scroll_addition(
+            16.0, 0.008, 100, false, 25, 0.0, 100.0, false, &[], &key_cfg(false),
         );
         assert!((addition - 0.8).abs() < 0.01, "addition={addition}");
     }
