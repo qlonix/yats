@@ -238,7 +238,7 @@ const YatsLogo = () => (
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
 const defaultScrollCurve = [
-  [0, 1.6335227], [1305, 3.90625], [1730, 21.448864], [2000, 79.360794]
+  [0, 2], [1305, 4], [1730, 21], [2000, 79]
 ];
 
 const CurveEditor = ({ points, onChange, minY = 0, maxY = 2000 }) => {
@@ -327,17 +327,16 @@ const CurveEditor = ({ points, onChange, minY = 0, maxY = 2000 }) => {
     const sy = e.clientY - rect.top;
 
     let x = fromSvgX(sx);
-    let y = fromSvgY(sy);
+    const y = Math.round(clamp(fromSvgY(sy), minY, maxY));
 
     const newPoints = [...sortedPoints];
     x = Math.max(0, Math.min(maxX, x));
-    y = clamp(y, minY, maxY);
 
     // Constraint: don't cross neighbors
     if (draggingIdx > 0) x = Math.max(newPoints[draggingIdx - 1][0] + 5, x);
     if (draggingIdx < n - 1) x = Math.min(newPoints[draggingIdx + 1][0] - 5, x);
 
-    newPoints[draggingIdx] = [x, y];
+    newPoints[draggingIdx] = [Math.round(x), y];
     onChange(newPoints);
   };
 
@@ -353,11 +352,8 @@ const CurveEditor = ({ points, onChange, minY = 0, maxY = 2000 }) => {
 
     if (sx < margin || sx > width - margin || sy < margin || sy > height - margin) return;
 
-    let x = fromSvgX(sx);
-    let y = fromSvgY(sy);
-
-    x = Math.max(0, Math.min(maxX, x));
-    y = clamp(y, minY, maxY);
+    const x = Math.round(clamp(fromSvgX(sx), 0, maxX));
+    const y = Math.round(clamp(fromSvgY(sy), minY, maxY));
 
     if (sortedPoints.some(p => Math.abs(toSvgX(p[0]) - sx) < 15)) return;
 
@@ -397,7 +393,7 @@ const CurveEditor = ({ points, onChange, minY = 0, maxY = 2000 }) => {
             <g key={v}>
               <line x1={margin} y1={svgY} x2={width - margin} y2={svgY} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
               <line x1={toSvgX(v * maxX)} y1={margin} x2={toSvgX(v * maxX)} y2={height - margin} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
-              <text x={margin - 8} y={svgY} fill="#666" fontSize="10" textAnchor="end" alignmentBaseline="middle">{Number(y.toFixed(2))}</text>
+              <text x={margin - 8} y={svgY} fill="#666" fontSize="10" textAnchor="end" alignmentBaseline="middle">{Math.round(y)}</text>
               <text x={toSvgX(v * maxX)} y={height - margin + 18} fill="#666" fontSize="10" textAnchor="middle">{Math.round(v * maxX)}</text>
             </g>
           );
@@ -488,7 +484,7 @@ function App() {
       const scaledY = oldRange > 0
         ? min + (y - linuxMinScrollSpeed) * (max - min) / oldRange
         : y;
-      return [x, clamp(scaledY, min, max)];
+      return [x, clamp(Math.round(scaledY), min, max)];
     });
 
     setLinuxMinScrollSpeed(min);
@@ -502,14 +498,16 @@ function App() {
   };
 
   const handleMinScrollSpeedChange = (val) => {
-    if (!Number.isFinite(val)) return;
-    const min = clamp(val, 0, linuxMaxScrollSpeed - 1);
+    const rounded = Math.round(val);
+    if (!Number.isFinite(rounded)) return;
+    const min = clamp(rounded, 0, linuxMaxScrollSpeed - 1);
     updateScrollOutputRange(min, linuxMaxScrollSpeed);
   };
 
   const handleMaxScrollSpeedChange = (val) => {
-    if (!Number.isFinite(val)) return;
-    const max = clamp(val, linuxMinScrollSpeed + 1, 2000);
+    const rounded = Math.round(val);
+    if (!Number.isFinite(rounded)) return;
+    const max = clamp(rounded, linuxMinScrollSpeed + 1, 2000);
     updateScrollOutputRange(linuxMinScrollSpeed, max);
   };
 
@@ -537,12 +535,12 @@ function App() {
       setScrollSensitivity(config.scroll_sensitivity ?? 1);
       setScrollSpeed(config.scroll_speed ?? 25);
       setScrollInvert(config.scroll_invert ?? true);
-      const min = config.linux_min_scroll_speed ?? 1;
-      const max = config.linux_max_scroll_speed ?? 100;
+      const min = clamp(Math.round(config.linux_min_scroll_speed ?? 1), 0, 1999);
+      const max = clamp(Math.round(config.linux_max_scroll_speed ?? 100), min + 1, 2000);
       const curve = config.linux_scroll_curve?.length ? config.linux_scroll_curve : defaultScrollCurve;
       setLinuxMinScrollSpeed(min);
       setLinuxMaxScrollSpeed(max);
-      setLinuxScrollCurve(curve.map(([x, y]) => [x, clamp(y, min, max)]));
+      setLinuxScrollCurve(curve.map(([x, y]) => [x, clamp(Math.round(y), min, max)]));
       setPalmRejection(config.palm_rejection ?? true);
       setPalmRejectionDelay(config.palm_rejection_delay_ms ?? 500);
     } catch (err) {
@@ -722,12 +720,12 @@ function App() {
                   <p className="setting-hint">Lower bound of the curve's output axis.</p>
                   <div className="setting-row">
                     <input
-                      type="range" min="0" max={linuxMaxScrollSpeed - 1} step="any"
+                      type="range" min="0" max={linuxMaxScrollSpeed - 1} step="1"
                       value={linuxMinScrollSpeed}
                       onChange={(e) => handleMinScrollSpeedChange(e.target.valueAsNumber)}
                     />
                     <input
-                      type="number" min="0" max={linuxMaxScrollSpeed - 1} step="any"
+                      type="number" min="0" max={linuxMaxScrollSpeed - 1} step="1"
                       value={linuxMinScrollSpeed}
                       onChange={(e) => handleMinScrollSpeedChange(e.target.valueAsNumber)}
                     />
@@ -739,12 +737,12 @@ function App() {
                   <p className="setting-hint">Upper bound of the curve's output axis. Changing it rescales the curve.</p>
                   <div className="setting-row">
                     <input
-                      type="range" min={linuxMinScrollSpeed + 1} max="2000" step="any"
+                      type="range" min={linuxMinScrollSpeed + 1} max="2000" step="1"
                       value={linuxMaxScrollSpeed}
                       onChange={(e) => handleMaxScrollSpeedChange(e.target.valueAsNumber)}
                     />
                     <input
-                      type="number" min={linuxMinScrollSpeed + 1} max="2000" step="any"
+                      type="number" min={linuxMinScrollSpeed + 1} max="2000" step="1"
                       value={linuxMaxScrollSpeed}
                       onChange={(e) => handleMaxScrollSpeedChange(e.target.valueAsNumber)}
                     />

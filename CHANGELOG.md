@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **開発運用**: Windows 版のビルドを GitHub Actions で行う方針に変更し、`.agent/rules.md` を実態に合わせて更新。
 - Min/Max Scroll Output Speed を Acceleration Curve の出力軸の範囲として統合。軸の範囲を変えるとカーブが形を保ったまま伸縮するようになり、バックエンド側のクランプとの競合を解消した。
 - 無効化されていた Min Mouse Distance と Min Mouse Speed の設定項目を削除（既存の `config.json` にキーが残っていても読み込みに影響しない）。
+- スクロール出力の値 (Min/Max Scroll Output Speed、カーブの点、グラフの軸ラベル) を整数に統一し、小数表示をなくした
 
 ## [1.3.7] - 2026-07-19
 
