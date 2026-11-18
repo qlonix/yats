@@ -226,7 +226,8 @@ unsafe fn check_hid_touch(device_handle: winapi::shared::ntdef::HANDLE, raw_hid:
         return false;
     }
     let mut button_caps = vec![std::mem::zeroed::<HIDP_BUTTON_CAPS>(); button_caps_length as usize];
-    let mut actual_button_caps_length = button_caps_length as ULONG;
+    // HidP_GetButtonCaps の第3引数は PUSHORT（*mut u16）のため、USHORT のまま渡す
+    let mut actual_button_caps_length: USHORT = button_caps_length;
     if HidP_GetButtonCaps(
         HidP_Input,
         button_caps.as_mut_ptr(),

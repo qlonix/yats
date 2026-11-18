@@ -5,6 +5,15 @@ All notable changes to YATS (Yet Another Touchpad Shortcut) will be documented i
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Windows版のコンパイルエラーを修正**: `HidP_GetButtonCaps` の第3引数（PUSHORT = `*mut u16`）に ULONG の参照を渡していた型不一致を修正。現行コードのままでは Windows 版がビルドできない状態だった。
+
+### Changed
+- **ドキュメント**: README に動作環境（対応 OS・アーキテクチャ・前提条件）を明記（日本語・英語）。
+- **開発運用**: Windows 版のビルドを GitHub Actions で行う方針に変更し、`.agent/rules.md` を実態に合わせて更新。
+
 ## [1.3.7] - 2026-07-19
 
 ### Added
