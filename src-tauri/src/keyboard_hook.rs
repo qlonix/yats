@@ -1,11 +1,11 @@
-use crate::config::{Action, AppConfig, ScrollConfig};
+use crate::config::{Action, AppConfig, ScrollConfig, WindowAction};
 use crate::touchpad_monitor::TouchpadMonitor;
 use crate::{lock_unpoison, platform, read_unpoison};
 use rdev::{simulate, EventType};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex, RwLock};
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
 pub static IS_PAUSED: AtomicBool = AtomicBool::new(false);
 pub static IS_SIMULATING: AtomicBool = AtomicBool::new(false);
@@ -26,7 +26,7 @@ pub enum RemapCommand {
 const VK_BROWSER_BACK: u16 = 0xA6;
 const VK_BROWSER_FORWARD: u16 = 0xA7;
 
-fn execute_action(action: Action, pressed: bool) {
+fn execute_action(action: Action, pressed: bool, app: &Mutex<Option<AppHandle>>) {
     match action {
         Action::MouseClick(mb) => {
             if pressed {
@@ -62,11 +62,26 @@ fn execute_action(action: Action, pressed: bool) {
                 IS_SIMULATING.store(false, Ordering::SeqCst);
             }
         }
-        Action::Window(win_act) => {
-            if pressed {
-                platform::execute_window_action(win_act);
+        Action::Window(win_act) if pressed => {
+            if matches!(win_act, WindowAction::Close) && platform::is_active_window_own() {
+                let app = lock_unpoison(app).clone();
+                if let Some(app) = app {
+                    let main_thread_app = app.clone();
+                    let _ = app.run_on_main_thread(move || {
+                        if let Some(window) = main_thread_app.get_webview_window("main") {
+                            if window.hide().is_ok() {
+                                crate::audit_log(
+                                    "[HOOK] Close Window の対象が YATS 自身のため、外部クローズではなくウィンドウを隠した",
+                                );
+                            }
+                        }
+                    });
+                    return;
+                }
             }
+            platform::execute_window_action(win_act);
         }
+        Action::Window(_) => {}
         Action::BrowserBack => {
             platform::send_key_click(VK_BROWSER_BACK, pressed);
         }
@@ -81,6 +96,7 @@ pub struct HookWorker {
     active_scroll: Option<ScrollConfig>,
     monitor: Arc<TouchpadMonitor>,
     config: Arc<RwLock<AppConfig>>,
+    app: Arc<Mutex<Option<AppHandle>>>,
     scroll_anchor: Option<(i32, i32)>,
     accumulator_y: f32,
     pending_y: f32,
@@ -92,12 +108,14 @@ impl HookWorker {
         rx: Receiver<RemapCommand>,
         monitor: Arc<TouchpadMonitor>,
         config: Arc<RwLock<AppConfig>>,
+        app: Arc<Mutex<Option<AppHandle>>>,
     ) -> Self {
         Self {
             rx,
             active_scroll: None,
             monitor,
             config,
+            app,
             scroll_anchor: None,
             accumulator_y: 0.0,
             pending_y: 0.0,
@@ -110,7 +128,7 @@ impl HookWorker {
             while let Ok(cmd) = self.rx.try_recv() {
                 match cmd {
                     RemapCommand::Execute(act, pressed) => {
-                        execute_action(act, pressed);
+                        execute_action(act, pressed, &self.app);
                     }
                     RemapCommand::UpdateScroll(cfg) => {
                         self.active_scroll = cfg;
@@ -174,7 +192,7 @@ impl KeyboardHook {
     pub fn new(
         monitor: Arc<TouchpadMonitor>,
         config: Arc<RwLock<AppConfig>>,
-        _app: Arc<Mutex<Option<AppHandle>>>,
+        app: Arc<Mutex<Option<AppHandle>>>,
     ) -> Self {
         let (tx, rx) = channel();
         let mon_clone = Arc::clone(&monitor);
@@ -182,7 +200,7 @@ impl KeyboardHook {
         std::thread::Builder::new()
             .name("hook-worker".into())
             .spawn(move || {
-                let mut worker = HookWorker::new(rx, mon_clone, cfg_clone);
+                let mut worker = HookWorker::new(rx, mon_clone, cfg_clone, app);
                 worker.run();
             })
             .expect("Failed to spawn hook worker thread");

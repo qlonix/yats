@@ -56,6 +56,36 @@ pub fn get_cursor_pos() -> Option<(i32, i32)> {
         .and_then(|e| e.location().ok())
 }
 
+/// アクティブウィンドウが自プロセスに属するか判定する。
+#[cfg(target_os = "windows")]
+pub fn is_active_window_own() -> bool {
+    use winapi::um::winuser::{GetForegroundWindow, GetWindowThreadProcessId};
+
+    unsafe {
+        let hwnd = GetForegroundWindow();
+        if hwnd.is_null() {
+            return false;
+        }
+        let mut pid = 0;
+        GetWindowThreadProcessId(hwnd, &mut pid) != 0 && pid == std::process::id()
+    }
+}
+
+#[cfg(target_os = "linux")]
+pub fn is_active_window_own() -> bool {
+    let Ok(output) = std::process::Command::new("xdotool")
+        .args(["getactivewindow", "getwindowpid"])
+        .output()
+    else {
+        return false;
+    };
+    output.status.success()
+        && String::from_utf8_lossy(&output.stdout)
+            .trim()
+            .parse::<u32>()
+            == Ok(std::process::id())
+}
+
 /// Set the cursor position
 #[cfg(target_os = "windows")]
 pub fn set_cursor_pos(x: i32, y: i32) {

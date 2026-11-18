@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Close Window アクションで YATS 自身のウィンドウを閉じるとアプリが終了してしまう問題を修正。対象が自ウィンドウの場合は外部クローズを送らず、トレイ常駐の既定動作どおりウィンドウを隠すようにした
 - **Windows版のコンパイルエラーを修正**: `HidP_GetButtonCaps` の第3引数（PUSHORT = `*mut u16`）に ULONG の参照を渡していた型不一致を修正。現行コードのままでは Windows 版がビルドできない状態だった。
 - スクロールの速度計測を実測ベース（8ms バッチの移動量 ÷ 実経過時間）に改修。従来は計測間隔が不安定で、カーブがピーキーになったり反応しなかったりした。あわせてカーブを Windows でも有効化し、Scroll Speed スライダーとキー別スクロール設定（感度・反転）がカーブ使用時にも反映されるようにした。
 - Linux: スクロールとブラウザ戻る/進むキーの送信を rdev（Xlib）から enigo（x11rb）に変更。X サーバーとの接続が切れた際に Xlib の致命的エラーハンドラでプロセスごと終了し得る経路を排除した。
