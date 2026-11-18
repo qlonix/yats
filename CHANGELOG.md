@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Scroll Tuning のカーブグラフにライブマーカーを追加。モーダルを開いた状態で他のウィンドウでスクロールすると、現在の入力速度とカーブ上の出力位置がリアルタイムで表示される
+
 ### Fixed
 - Close Window アクションで YATS 自身のウィンドウを閉じるとアプリが終了してしまう問題を修正。対象が自ウィンドウの場合は外部クローズを送らず、トレイ常駐の既定動作どおりウィンドウを隠すようにした
 - **Windows版のコンパイルエラーを修正**: `HidP_GetButtonCaps` の第3引数（PUSHORT = `*mut u16`）に ULONG の参照を渡していた型不一致を修正。現行コードのままでは Windows 版がビルドできない状態だった。

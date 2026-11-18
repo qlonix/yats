@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import LegacyScrollSettings from "./LegacyScrollSettings";
 import "./App.css";
@@ -241,7 +242,7 @@ const defaultScrollCurve = [
   [0, 2], [1305, 4], [1730, 21], [2000, 79]
 ];
 
-const CurveEditor = ({ points, onChange, minY = 0, maxY = 2000 }) => {
+const CurveEditor = ({ points, onChange, minY = 0, maxY = 2000, livePoint }) => {
   const [draggingIdx, setDraggingIdx] = useState(null);
   const svgRef = useRef(null);
   const width = 480;
@@ -370,6 +371,8 @@ const CurveEditor = ({ points, onChange, minY = 0, maxY = 2000 }) => {
   };
 
   const splineData = getSplinePoints();
+  const liveX = livePoint && toSvgX(clamp(livePoint.x, 0, maxX));
+  const liveY = livePoint && toSvgY(clamp(livePoint.y, minY, maxY));
   const pathData = splineData.length > 0
     ? `M ${toSvgX(splineData[0][0])} ${toSvgY(splineData[0][1])} ` +
     splineData.slice(1).map(p => `L ${toSvgX(p[0])} ${toSvgY(p[1])}`).join(' ')
@@ -425,6 +428,13 @@ const CurveEditor = ({ points, onChange, minY = 0, maxY = 2000 }) => {
             style={{ cursor: "pointer", transition: "r 0.1s" }}
           />
         ))}
+        {livePoint && (
+          <g pointerEvents="none" aria-hidden="true">
+            <line x1={liveX} y1={liveY} x2={liveX} y2={height - margin} stroke="#ffcf5a" strokeOpacity={0.6} strokeWidth={1} />
+            <circle cx={liveX} cy={liveY} r={12} fill="#ffcf5a" fillOpacity={0.25} />
+            <circle cx={liveX} cy={liveY} r={6} fill="#ffcf5a" stroke="#fff" strokeWidth={2} />
+          </g>
+        )}
       </svg>
     </div>
   );
@@ -445,6 +455,8 @@ function App() {
   const [palmRejectionDelay, setPalmRejectionDelay] = useState(500);
   const [recordingMacroKey, setRecordingMacroKey] = useState(null);
   const [showScrollTuning, setShowScrollTuning] = useState(false);
+  const [livePoint, setLivePoint] = useState(null);
+  const livePointTimer = useRef(null);
   const [scrollInvert, setScrollInvert] = useState(true);
   const [scrollSensitivity, setScrollSensitivity] = useState(1);
   const [scrollSpeed, setScrollSpeed] = useState(25);
@@ -452,6 +464,38 @@ function App() {
   const [linuxMaxScrollSpeed, setLinuxMaxScrollSpeed] = useState(100);
   const [linuxScrollCurve, setLinuxScrollCurve] = useState(defaultScrollCurve);
   const [showLegacySettings, setShowLegacySettings] = useState(false);
+
+  useEffect(() => {
+    if (!showScrollTuning) return;
+
+    let closed = false;
+    let unlisten;
+    listen("scroll-activity", ({ payload }) => {
+      if (closed) return;
+      setLivePoint({ x: payload.input, y: payload.output });
+      clearTimeout(livePointTimer.current);
+      livePointTimer.current = setTimeout(() => {
+        livePointTimer.current = null;
+        setLivePoint(null);
+      }, 500);
+    }).then((dispose) => {
+      if (closed) {
+        dispose();
+        return;
+      }
+      unlisten = dispose;
+      return invoke("set_curve_monitoring", { enabled: true });
+    }).catch(console.error);
+
+    return () => {
+      closed = true;
+      unlisten?.();
+      invoke("set_curve_monitoring", { enabled: false }).catch(console.error);
+      clearTimeout(livePointTimer.current);
+      livePointTimer.current = null;
+      setLivePoint(null);
+    };
+  }, [showScrollTuning]);
 
   // Centralized robust save function
   const saveConfigWithLatest = async (overrides = {}) => {
@@ -551,9 +595,7 @@ function App() {
   useEffect(() => {
     loadConfig();
     invoke("get_paused_cmd").then(setIsPaused);
-    import("@tauri-apps/api/event").then(({ listen }) => {
-      listen("pause-status", (event) => setIsPaused(event.payload));
-    });
+    listen("pause-status", (event) => setIsPaused(event.payload));
     invoke("get_startup_status_cmd").then(setAutoStart);
     invoke("get_app_version").then(setAppVersion).catch(console.error);
 
@@ -755,6 +797,7 @@ function App() {
                 <div className="curve-editor-container">
                   <CurveEditor
                     points={linuxScrollCurve}
+                    livePoint={livePoint}
                     minY={linuxMinScrollSpeed}
                     maxY={linuxMaxScrollSpeed}
                     onChange={(newPoints) => {

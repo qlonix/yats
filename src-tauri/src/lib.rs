@@ -4,7 +4,7 @@ mod platform;
 mod touchpad_monitor;
 
 use crate::config::AppConfig;
-use crate::keyboard_hook::{KeyboardHook, IS_PAUSED};
+use crate::keyboard_hook::{KeyboardHook, CURVE_MONITORING, CURVE_MONITORING_LOCK, IS_PAUSED};
 use crate::platform::SystemInfo;
 use crate::touchpad_monitor::TouchpadMonitor;
 use std::fs::OpenOptions;
@@ -158,6 +158,12 @@ fn set_paused_cmd(app: tauri::AppHandle, paused: bool) {
     audit_log(&format!("[SYSTEM] Pause state changed to: {}", paused));
 }
 
+#[tauri::command]
+fn set_curve_monitoring(enabled: bool) {
+    let _monitoring_guard = lock_unpoison(&CURVE_MONITORING_LOCK);
+    CURVE_MONITORING.store(enabled, Ordering::SeqCst);
+}
+
 // Startup functions using platform-specific implementation
 #[tauri::command]
 fn set_startup_cmd(enabled: bool) -> Result<(), String> {
@@ -246,6 +252,7 @@ pub fn run() {
             get_log_path_cmd,
             get_paused_cmd,
             set_paused_cmd,
+            set_curve_monitoring,
             set_startup_cmd,
             get_startup_status_cmd,
             get_aap_threshold,

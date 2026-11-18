@@ -5,10 +5,18 @@ use rdev::{simulate, EventType};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex, RwLock};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 pub static IS_PAUSED: AtomicBool = AtomicBool::new(false);
+pub static CURVE_MONITORING: AtomicBool = AtomicBool::new(false);
+pub(crate) static CURVE_MONITORING_LOCK: Mutex<()> = Mutex::new(());
 pub static IS_SIMULATING: AtomicBool = AtomicBool::new(false);
+
+#[derive(Clone, serde::Serialize)]
+struct ScrollActivity {
+    input: f32,
+    output: f32,
+}
 
 pub struct KeyboardHook {
     monitor: Arc<TouchpadMonitor>,
@@ -101,6 +109,7 @@ pub struct HookWorker {
     accumulator_y: f32,
     pending_y: f32,
     last_scroll_time: std::time::Instant,
+    last_activity_emit: std::time::Instant,
 }
 
 impl HookWorker {
@@ -120,6 +129,7 @@ impl HookWorker {
             accumulator_y: 0.0,
             pending_y: 0.0,
             last_scroll_time: std::time::Instant::now(),
+            last_activity_emit: std::time::Instant::now(),
         }
     }
 
@@ -155,9 +165,10 @@ impl HookWorker {
                 if interval >= std::time::Duration::from_millis(8) {
                     if self.pending_y != 0.0 {
                         let cfg = read_unpoison(&self.config);
+                        let elapsed = interval.as_secs_f32().max(0.001);
                         self.accumulator_y += compute_scroll_addition(
                             self.pending_y,
-                            interval.as_secs_f32().max(0.001),
+                            elapsed,
                             cfg.scroll_sensitivity,
                             cfg.scroll_invert,
                             cfg.scroll_speed,
@@ -167,6 +178,23 @@ impl HookWorker {
                             &cfg.linux_scroll_curve,
                             key_cfg,
                         );
+                        if cfg.linux_use_scroll_curve
+                            && CURVE_MONITORING.load(Ordering::SeqCst)
+                            && now.duration_since(self.last_activity_emit)
+                                >= std::time::Duration::from_millis(50)
+                        {
+                            let input = self.pending_y.abs() / elapsed;
+                            let output = interpolate_curve(&cfg.linux_scroll_curve, input);
+                            drop(cfg);
+                            if let Some(app) = lock_unpoison(&self.app).as_ref() {
+                                let _monitoring_guard = lock_unpoison(&CURVE_MONITORING_LOCK);
+                                if CURVE_MONITORING.load(Ordering::SeqCst) {
+                                    let _ = app
+                                        .emit("scroll-activity", ScrollActivity { input, output });
+                                    self.last_activity_emit = std::time::Instant::now();
+                                }
+                            }
+                        }
                     }
                     self.pending_y = 0.0;
                     let output = self.accumulator_y.trunc() as i32;
