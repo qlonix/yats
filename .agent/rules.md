@@ -20,6 +20,6 @@
 - **コード類に変更があった場合は、都度 GitHub へプッシュ（git push）を行う。**
 - **GitHubのReleasesは指示があるまで追加/変更しない。**
 - **GitHubのReleasesのAssetsへの追加・アップデートは指示があるまで行わない。**
-- **Windows 版のビルドはローカルだけで行う。GitHub Actions でのビルドは禁止する。**
-- **ビルド成果物（Windows, Linux 共に）は、ビルドの都度 `Z:\devel\Antigravity\yats\[バージョン番号]` フォルダにコピーして保管する。**
+- **Windows 版のビルドは GitHub Actions で行う（手元に Windows のビルド環境がないため）。Linux 版はローカル環境でもビルドできるが、配布用バイナリは glibc 互換のため Ubuntu 22.04 環境でビルドする。**
+- **ビルド成果物（Windows, Linux 共に）は、ビルドの都度 `Z:\devel\Antigravity\yats\[バージョン番号]` フォルダにコピーして保管する（GitHub Actions でビルドした場合は、Actions の artifacts から取得して保管する）。**
 - **変更履歴を `CHANGELOG.md` に記載していく。**

@@ -24,6 +24,17 @@ YATS ではタッチパッドへ触れているかどうかではなく、マウ
   - ウィンドウ操作 (閉じる、最大化/元に戻す、最小化)
   - スクロール
 
+## 動作環境
+
+| 項目 | Windows | Linux |
+|---|---|---|
+| OS | Windows 10 / 11（64bit） | 64bit ディストリビューション（glibc 2.35 以降。Ubuntu 22.04 以降相当） |
+| アーキテクチャ | x86_64 | x86_64 |
+| その他 | Microsoft Edge WebView2 ランタイム（通常は OS に含まれています） | X11 セッション推奨（Wayland では一部機能に制限あり。下記「既知の制限」参照） |
+
+- Windows のパームリジェクションは Precision Touchpad（PTP）搭載機種で動作します。それ以外のポインティングデバイスでも、カーソル移動をトリガーとする基本機能は利用できます。
+- Linux ではデバイスアクセス権限の設定が必要です（下記「必須要件」参照）。
+
 ## インストール
 
 ### Windows
@@ -123,6 +134,17 @@ Since it doesn't even need to be a touchpad, it can also be used in combination 
   - Keyboard macros
   - Window operations (Close, Maximize/Restore, Minimize)
   - Scrolling
+
+## System Requirements
+
+| Item | Windows | Linux |
+|---|---|---|
+| OS | Windows 10 / 11 (64-bit) | 64-bit distribution (glibc 2.35 or later, equivalent to Ubuntu 22.04 or later) |
+| Architecture | x86_64 | x86_64 |
+| Other | Microsoft Edge WebView2 Runtime (normally included with the OS) | X11 session recommended (some features are limited on Wayland; see "Known Limitations" below) |
+
+- Palm rejection on Windows works on machines with a Precision Touchpad (PTP). The basic features, which use cursor movement as the trigger, also work with other pointing devices.
+- On Linux, device access permissions must be configured (see "Requirements" below).
 
 ## Installation
 
