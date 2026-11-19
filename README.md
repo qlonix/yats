@@ -23,6 +23,10 @@ YATS ではタッチパッドへ触れているかどうかではなく、マウ
   - キーボードマクロ
   - ウィンドウ操作 (閉じる、最大化/元に戻す、最小化)
   - スクロール
+- **スクロール調整 (Scroll Tuning)**:
+  - 加速度カーブをグラフで編集でき、出力軸 (Min/Max Scroll Output Speed) と入力軸の上限 (Max Input Speed) を変更すると、カーブが形を保ったまま伸縮します
+  - 入力速度の上限の初期値は、接続中のモニタ幅から自動決定されます
+  - 調整中は、現在のスクロール速度に対応する点がグラフ上にリアルタイムで表示されます
 
 ## 動作環境
 
@@ -134,6 +138,10 @@ Since it doesn't even need to be a touchpad, it can also be used in combination 
   - Keyboard macros
   - Window operations (Close, Maximize/Restore, Minimize)
   - Scrolling
+- **Scroll Tuning**:
+  - Edit the acceleration curve on a graph; changing the output axis range (Min/Max Scroll Output Speed) or the input axis limit (Max Input Speed) rescales the curve while preserving its shape
+  - The input speed limit is initially determined automatically from your monitor width
+  - While tuning, a live marker shows the point on the curve for your current scroll speed in real time
 
 ## System Requirements
 
