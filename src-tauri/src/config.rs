@@ -55,9 +55,14 @@ pub struct AppConfig {
     #[serde(default = "default_linux_max_scroll_speed")]
     pub linux_max_scroll_speed: f32,
     #[serde(default)]
+    pub linux_max_input_speed: i32,
+    #[serde(default)]
     pub linux_use_scroll_curve: bool,
     #[serde(default = "default_linux_scroll_curve")]
     pub linux_scroll_curve: Vec<(f32, f32)>,
+    // Expose whether the frontend should scale the fallback curve.
+    #[serde(skip_deserializing)]
+    pub linux_scroll_curve_is_default: bool,
     #[serde(default = "default_palm_rejection")]
     pub palm_rejection: bool,
     #[serde(default = "default_palm_rejection_delay")]
@@ -146,8 +151,10 @@ impl Default for AppConfig {
             scroll_invert: true,
             linux_min_scroll_speed: 1.0,
             linux_max_scroll_speed: 100.0,
+            linux_max_input_speed: 0,
             linux_use_scroll_curve: true,
             linux_scroll_curve: default_linux_scroll_curve(),
+            linux_scroll_curve_is_default: true,
             palm_rejection: true,
             palm_rejection_delay_ms: 500,
         }
@@ -159,13 +166,15 @@ impl AppConfig {
         let path = Self::get_config_path(app);
         if path.exists() {
             if let Ok(content) = fs::read_to_string(path) {
-                // 最初に直接デシリアライズを試みる
-                if let Ok(config) = serde_json::from_str::<AppConfig>(&content) {
-                    return config;
-                }
-
-                // 失敗した場合、KeyMacro 型の手動移行を試みる
                 if let Ok(mut value) = serde_json::from_str::<serde_json::Value>(&content) {
+                    let curve_is_default = value.get("linux_scroll_curve").is_none();
+                    // 最初に直接デシリアライズを試みる
+                    if let Ok(mut config) = serde_json::from_str::<AppConfig>(&content) {
+                        config.linux_scroll_curve_is_default = curve_is_default;
+                        return config;
+                    }
+
+                    // 失敗した場合、KeyMacro 型の手動移行を試みる
                     if let Some(mappings) =
                         value.get_mut("mappings").and_then(|m| m.as_object_mut())
                     {
@@ -187,7 +196,8 @@ impl AppConfig {
                         }
                     }
                     // 移行したオブジェクトのデシリアライズを試みる
-                    if let Ok(config) = serde_json::from_value::<AppConfig>(value) {
+                    if let Ok(mut config) = serde_json::from_value::<AppConfig>(value) {
+                        config.linux_scroll_curve_is_default = curve_is_default;
                         return config;
                     }
                 }

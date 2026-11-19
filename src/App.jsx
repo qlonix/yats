@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { currentMonitor } from "@tauri-apps/api/window";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import LegacyScrollSettings from "./LegacyScrollSettings";
 import "./App.css";
@@ -242,15 +243,26 @@ const defaultScrollCurve = [
   [0, 2], [1305, 4], [1730, 21], [2000, 79]
 ];
 
-const CurveEditor = ({ points, onChange, minY = 0, maxY = 2000, livePoint }) => {
+const getAutomaticMaxInputSpeed = async () => {
+  try {
+    const monitor = await currentMonitor();
+    const width = monitor?.size.width;
+    if (Number.isFinite(width) && width > 0) {
+      return clamp(Math.round(width * 3 / 100) * 100, 1000, 20000);
+    }
+  } catch {
+    // Use the default when the monitor is unavailable.
+  }
+  return 2000;
+};
+
+const CurveEditor = ({ points, onChange, maxX = 2000, minY = 0, maxY = 2000, livePoint }) => {
   const [draggingIdx, setDraggingIdx] = useState(null);
   const svgRef = useRef(null);
   const width = 480;
   const height = 300;
   const margin = 40;
 
-  // X is fixed to 2000 for mouse speed, Y is dynamic
-  const maxX = 2000;
   const yRange = maxY - minY;
 
   const toSvgX = (x) => margin + (x / maxX) * (width - 2 * margin);
@@ -331,13 +343,12 @@ const CurveEditor = ({ points, onChange, minY = 0, maxY = 2000, livePoint }) => 
     const y = Math.round(clamp(fromSvgY(sy), minY, maxY));
 
     const newPoints = [...sortedPoints];
-    x = Math.max(0, Math.min(maxX, x));
 
     // Constraint: don't cross neighbors
     if (draggingIdx > 0) x = Math.max(newPoints[draggingIdx - 1][0] + 5, x);
     if (draggingIdx < n - 1) x = Math.min(newPoints[draggingIdx + 1][0] - 5, x);
 
-    newPoints[draggingIdx] = [Math.round(x), y];
+    newPoints[draggingIdx] = [Math.round(clamp(x, 0, maxX)), y];
     onChange(newPoints);
   };
 
@@ -462,6 +473,7 @@ function App() {
   const [scrollSpeed, setScrollSpeed] = useState(25);
   const [linuxMinScrollSpeed, setLinuxMinScrollSpeed] = useState(1);
   const [linuxMaxScrollSpeed, setLinuxMaxScrollSpeed] = useState(100);
+  const [linuxMaxInputSpeed, setLinuxMaxInputSpeed] = useState(2000);
   const [linuxScrollCurve, setLinuxScrollCurve] = useState(defaultScrollCurve);
   const [showLegacySettings, setShowLegacySettings] = useState(false);
 
@@ -510,6 +522,7 @@ function App() {
         scroll_invert: overrides.scrollInvert !== undefined ? overrides.scrollInvert : scrollInvert,
         linux_min_scroll_speed: overrides.linuxMinScrollSpeed !== undefined ? overrides.linuxMinScrollSpeed : linuxMinScrollSpeed,
         linux_max_scroll_speed: overrides.linuxMaxScrollSpeed !== undefined ? overrides.linuxMaxScrollSpeed : linuxMaxScrollSpeed,
+        linux_max_input_speed: overrides.linuxMaxInputSpeed ?? linuxMaxInputSpeed,
         linux_use_scroll_curve: true, // Fixed as baseline
         linux_scroll_curve: overrides.linuxScrollCurve !== undefined ? overrides.linuxScrollCurve : linuxScrollCurve,
         palm_rejection: overrides.palmRejection !== undefined ? overrides.palmRejection : palmRejection,
@@ -555,9 +568,37 @@ function App() {
     updateScrollOutputRange(linuxMinScrollSpeed, max);
   };
 
+  const handleMaxInputSpeedChange = (val) => {
+    const rounded = Math.round(val);
+    if (!Number.isFinite(rounded)) return;
+    const newMax = clamp(rounded, 1000, 20000);
+    if (newMax === linuxMaxInputSpeed) return;
+
+    const minSpacing = 10;
+    if ((linuxScrollCurve.length - 1) * minSpacing > newMax) return;
+
+    const curve = linuxScrollCurve
+      .map(([x, y]) => [clamp(Math.round(x * newMax / linuxMaxInputSpeed), 0, newMax), y])
+      .sort((a, b) => a[0] - b[0]);
+
+    for (let i = 0; i < curve.length; i++) {
+      const lower = i === 0 ? 0 : curve[i - 1][0] + minSpacing;
+      // Leave room for the remaining points near the right edge.
+      const upper = newMax - (curve.length - 1 - i) * minSpacing;
+      curve[i][0] = clamp(curve[i][0], lower, upper);
+    }
+
+    setLinuxMaxInputSpeed(newMax);
+    setLinuxScrollCurve(curve);
+    saveConfigWithLatest({ linuxMaxInputSpeed: newMax, linuxScrollCurve: curve });
+  };
+
   const loadConfig = async () => {
     try {
       const config = await invoke("get_config");
+      const maxInput = config.linux_max_input_speed > 0
+        ? config.linux_max_input_speed
+        : await getAutomaticMaxInputSpeed();
       const rawMappings = config.mappings || {};
       const normalized = {};
       Object.keys(rawMappings).forEach(key => {
@@ -581,10 +622,15 @@ function App() {
       setScrollInvert(config.scroll_invert ?? true);
       const min = clamp(Math.round(config.linux_min_scroll_speed ?? 1), 0, 1999);
       const max = clamp(Math.round(config.linux_max_scroll_speed ?? 100), min + 1, 2000);
-      const curve = config.linux_scroll_curve?.length ? config.linux_scroll_curve : defaultScrollCurve;
+      const useDefaultCurve = config.linux_scroll_curve_is_default || !config.linux_scroll_curve?.length;
+      const curve = useDefaultCurve ? defaultScrollCurve : config.linux_scroll_curve;
       setLinuxMinScrollSpeed(min);
       setLinuxMaxScrollSpeed(max);
-      setLinuxScrollCurve(curve.map(([x, y]) => [x, clamp(Math.round(y), min, max)]));
+      setLinuxMaxInputSpeed(maxInput);
+      setLinuxScrollCurve(curve.map(([x, y]) => [
+        Math.round(useDefaultCurve ? x * maxInput / 2000 : clamp(x, 0, maxInput)),
+        clamp(Math.round(y), min, max),
+      ]));
       setPalmRejection(config.palm_rejection ?? true);
       setPalmRejectionDelay(config.palm_rejection_delay_ms ?? 500);
     } catch (err) {
@@ -733,6 +779,7 @@ function App() {
         setScrollInvert={setScrollInvert}
         linuxMinScrollSpeed={linuxMinScrollSpeed}
         linuxMaxScrollSpeed={linuxMaxScrollSpeed}
+        linuxMaxInputSpeed={linuxMaxInputSpeed}
         linuxScrollCurve={linuxScrollCurve}
         saveConfigWithLatest={saveConfigWithLatest}
       />
@@ -790,6 +837,23 @@ function App() {
                     />
                   </div>
                 </div>
+
+                <div className="setting-item full-width">
+                  <label className="setting-label">Max Input Speed</label>
+                  <p className="setting-hint">Upper bound of the curve's input axis. Changing it rescales the curve.</p>
+                  <div className="setting-row">
+                    <input
+                      type="range" min="1000" max="20000" step="100"
+                      value={linuxMaxInputSpeed}
+                      onChange={(e) => handleMaxInputSpeedChange(e.target.valueAsNumber)}
+                    />
+                    <input
+                      type="number" min="1000" max="20000" step="1"
+                      value={linuxMaxInputSpeed}
+                      onChange={(e) => handleMaxInputSpeedChange(e.target.valueAsNumber)}
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="curve-section">
@@ -798,6 +862,7 @@ function App() {
                   <CurveEditor
                     points={linuxScrollCurve}
                     livePoint={livePoint}
+                    maxX={linuxMaxInputSpeed}
                     minY={linuxMinScrollSpeed}
                     maxY={linuxMaxScrollSpeed}
                     onChange={(newPoints) => {

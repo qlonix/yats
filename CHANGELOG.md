@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- カーブグラフの X 軸 (入力マウス速度) の上限を設定可能にした。初期値は接続中のモニタ幅から自動決定され、上限を変えるとカーブが形を保ったまま横方向に伸縮する
+
 ## [1.3.8] - 2026-11-19
 
 ### Added

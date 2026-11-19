@@ -12,6 +12,7 @@ const LegacyScrollSettings = ({
     setScrollInvert,
     linuxMinScrollSpeed,
     linuxMaxScrollSpeed,
+    linuxMaxInputSpeed,
     linuxScrollCurve
 }) => {
     const [exportMsg, setExportMsg] = useState("");
@@ -25,6 +26,7 @@ const LegacyScrollSettings = ({
             scroll_invert: scrollInvert,
             linux_min_scroll_speed: linuxMinScrollSpeed,
             linux_max_scroll_speed: linuxMaxScrollSpeed,
+            linux_max_input_speed: linuxMaxInputSpeed,
             linux_scroll_curve: linuxScrollCurve
         };
         const json = JSON.stringify(params, null, 2);
