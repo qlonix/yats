@@ -112,6 +112,26 @@ pub fn run_monitor(state: Arc<MonitorState>) {
 }
 
 fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
+    let axes = device.supported_absolute_axes();
+    let has_axis = |axis| axes.is_some_and(|axes| axes.contains(axis));
+    let has_touch_major = has_axis(AbsoluteAxisType::ABS_MT_TOUCH_MAJOR);
+    let (major_resolution, major_maximum) = if has_touch_major {
+        device.get_abs_state().map_or((0, 0), |abs_state| {
+            let major = &abs_state[AbsoluteAxisType::ABS_MT_TOUCH_MAJOR.0 as usize];
+            (major.resolution, major.maximum)
+        })
+    } else {
+        (0, 0)
+    };
+    crate::audit_log(&format!(
+        "[MONITOR] MT axes: tool_type={} touch_major={} (res={} max={}) pressure={}",
+        has_axis(AbsoluteAxisType::ABS_MT_TOOL_TYPE),
+        has_touch_major,
+        major_resolution,
+        major_maximum,
+        has_axis(AbsoluteAxisType::ABS_MT_PRESSURE),
+    ));
+
     let mut last_abs_x: Option<i32> = None;
     let mut last_abs_y: Option<i32> = None;
     let mut accum_x: i32 = 0;
@@ -121,9 +141,11 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
     // Track touch slots and palm state
     let mut current_slot: usize = 0;
     let mut slot_is_palm = [false; 16];
+    let mut slot_major_palm = [false; 16];
 
     const ABS_MT_SLOT: u16 = 0x2f;
-    const ABS_MT_TOOL_TYPE: u16 = 0x37;
+    const ABS_MT_TOOL_TYPE: u16 = AbsoluteAxisType::ABS_MT_TOOL_TYPE.0;
+    const ABS_MT_TOUCH_MAJOR: u16 = AbsoluteAxisType::ABS_MT_TOUCH_MAJOR.0;
     const ABS_MT_TRACKING_ID: u16 = 0x39;
 
     let mut grabbed = false;
@@ -170,12 +192,29 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                             // Touch released for this slot
                             if current_slot < slot_is_palm.len() {
                                 slot_is_palm[current_slot] = false;
+                                slot_major_palm[current_slot] = false;
                             }
                         }
                     } else if code == ABS_MT_TOOL_TYPE {
                         // MT_TOOL_PALM = 2
                         if current_slot < slot_is_palm.len() {
-                            slot_is_palm[current_slot] = ev.value() == 2;
+                            let is_palm = ev.value() == 2;
+                            if is_palm && !slot_is_palm[current_slot] {
+                                crate::audit_log(&format!(
+                                    "[PALM] slot {current_slot} rejected by tool_type"
+                                ));
+                            }
+                            slot_is_palm[current_slot] = is_palm;
+                        }
+                    } else if code == ABS_MT_TOUCH_MAJOR && major_resolution > 0 {
+                        let size_mm = f64::from(ev.value()) / f64::from(major_resolution);
+                        // 一度しきい値を超えたら、その接触が終わるまでパーム扱いを維持する
+                        // （接触面積は指の重みで上下するため、値に追従させると判定が漏れる）。
+                        if size_mm >= 15.0 && !slot_major_palm[current_slot] {
+                            crate::audit_log(&format!(
+                                "[PALM] slot {current_slot} rejected by size ({size_mm:.1} mm)"
+                            ));
+                            slot_major_palm[current_slot] = true;
                         }
                     }
                 }
@@ -186,16 +225,20 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                 {
                     // Check if current event is considered a palm touch
                     let is_palm = if ev_type == EventType::ABSOLUTE {
-                        current_slot < slot_is_palm.len() && slot_is_palm[current_slot]
+                        slot_is_palm[current_slot] || slot_major_palm[current_slot]
                     } else {
                         // For relative/key events, check if any active slot is marked as palm
-                        slot_is_palm.iter().any(|&p| p)
+                        slot_is_palm.iter().chain(&slot_major_palm).any(|&p| p)
                     };
 
                     if !is_palm {
-                        state.is_touched.store(true, Ordering::SeqCst);
                         if let Ok(mut last_time) = state.last_touch_time.lock() {
-                            *last_time = std::time::Instant::now();
+                            let now = std::time::Instant::now();
+                            *last_time = now;
+                            if let Ok(mut start_time) = state.touch_start_time.lock() {
+                                start_time.get_or_insert(now);
+                            }
+                            state.is_touched.store(true, Ordering::SeqCst);
                         }
                     }
 

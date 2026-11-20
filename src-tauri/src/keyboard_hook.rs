@@ -281,6 +281,9 @@ impl KeyboardHook {
                                     if let Some(last_time) = *lock_unpoison(&last_typing_inner) {
                                         now.duration_since(last_time).as_millis()
                                             < cfg.palm_rejection_delay_ms as u128
+                                            || monitor_inner
+                                                .touch_started_at()
+                                                .is_some_and(|started_at| started_at < last_time)
                                     } else {
                                         false
                                     }
@@ -496,6 +499,11 @@ impl KeyboardHook {
                                                                 .as_millis()
                                                                 < cfg.palm_rejection_delay_ms
                                                                     as u128
+                                                                || monitor_inner
+                                                                    .touch_started_at()
+                                                                    .is_some_and(|started_at| {
+                                                                        started_at < last_time
+                                                                    })
                                                         } else {
                                                             false
                                                         }

@@ -297,6 +297,7 @@ pub fn run() {
             let _tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
                 .tooltip(format!("YATS Ver. {}", env!("CARGO_PKG_VERSION")))
+                .title(format!("YATS Ver. {}", env!("CARGO_PKG_VERSION")))
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {

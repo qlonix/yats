@@ -88,9 +88,13 @@ pub unsafe extern "system" fn wnd_proc(
                 }
 
                 if event_detected {
-                    state.is_touched.store(true, Ordering::SeqCst);
                     if let Ok(mut last_time) = state.last_touch_time.lock() {
-                        *last_time = std::time::Instant::now();
+                        let now = std::time::Instant::now();
+                        *last_time = now;
+                        if let Ok(mut start_time) = state.touch_start_time.lock() {
+                            start_time.get_or_insert(now);
+                        }
+                        state.is_touched.store(true, Ordering::SeqCst);
                     }
                     if let Ok(h) = state.app_handle.try_lock() {
                         if let Some(app) = &*h {

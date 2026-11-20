@@ -12,6 +12,7 @@ pub struct MonitorState {
     pub is_touched: AtomicBool,
     pub cursor_freeze: AtomicBool,
     pub last_touch_time: Mutex<std::time::Instant>,
+    pub touch_start_time: Mutex<Option<std::time::Instant>>,
     pub x_delta: AtomicI32,
     pub y_delta: AtomicI32,
     pub release_delay_ms: AtomicU32,
@@ -35,6 +36,7 @@ impl TouchpadMonitor {
             last_touch_time: Mutex::new(
                 std::time::Instant::now() - std::time::Duration::from_secs(10),
             ),
+            touch_start_time: Mutex::new(None),
             x_delta: AtomicI32::new(0),
             y_delta: AtomicI32::new(0),
             release_delay_ms: AtomicU32::new(150),
@@ -108,19 +110,20 @@ impl TouchpadMonitor {
                         }
                     }
 
-                    let last_touch = { *lock_unpoison(&state_watch.last_touch_time) };
-                    let delay = state_watch.release_delay_ms.load(Ordering::SeqCst) as u64;
-
-                    if std::time::Instant::now()
-                        .duration_since(last_touch)
-                        .as_millis()
-                        > delay as u128
-                    {
-                        if state_watch.is_touched.swap(false, Ordering::SeqCst) {
-                            if let Ok(h) = state_watch.app_handle.try_lock() {
-                                if let Some(app) = &*h {
-                                    let _ = app.emit("touchpad-status", false).ok();
-                                }
+                    let released = {
+                        let last_touch = lock_unpoison(&state_watch.last_touch_time);
+                        let delay = state_watch.release_delay_ms.load(Ordering::SeqCst);
+                        let released = last_touch.elapsed().as_millis() > delay as u128
+                            && state_watch.is_touched.swap(false, Ordering::SeqCst);
+                        if released {
+                            *lock_unpoison(&state_watch.touch_start_time) = None;
+                        }
+                        released
+                    };
+                    if released {
+                        if let Ok(h) = state_watch.app_handle.try_lock() {
+                            if let Some(app) = &*h {
+                                let _ = app.emit("touchpad-status", false).ok();
                             }
                         }
                     }
@@ -153,6 +156,10 @@ impl TouchpadMonitor {
 
     pub fn is_touched(&self) -> bool {
         self.state.is_touched.load(Ordering::SeqCst)
+    }
+
+    pub fn touch_started_at(&self) -> Option<std::time::Instant> {
+        *lock_unpoison(&self.state.touch_start_time)
     }
 
     pub fn consume_y_delta(&self) -> i32 {
