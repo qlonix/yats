@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to YATS (Yet Another Touchpad Shortcut) will be documented in this file.
+Each version's entry is written in both Japanese and English.
+
+YATS (Yet Another Touchpad Shortcut) の主な変更はすべてこのファイルに記録します。
+各バージョンのエントリは日本語と英語で併記しています。
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -9,13 +13,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.3.9] - 2026-11-20
 
+**日本語**
+
 ### Added
 - カーブグラフの X 軸 (入力マウス速度) の上限を設定可能にした。初期値は接続中のモニタ幅から自動決定され、上限を変えるとカーブが形を保ったまま横方向に伸縮する
 
 ### Changed
 - **ドキュメント**: README の機能一覧に Scroll Tuning (カーブ編集・軸範囲・ライブマーカー) の説明を追加（日本語・英語）。
 
+**English**
+
+### Added
+- Made the upper limit of the curve graph's X axis (input mouse speed) configurable. The initial value is determined automatically from the connected monitor's width, and changing the limit rescales the curve horizontally while preserving its shape
+
+### Changed
+- **Documentation**: Added a description of Scroll Tuning (curve editing, axis ranges, live marker) to the README feature list (Japanese and English).
+
 ## [1.3.8] - 2026-11-19
+
+**日本語**
 
 ### Added
 - Scroll Tuning のカーブグラフにライブマーカーを追加。モーダルを開いた状態で他のウィンドウでスクロールすると、現在の入力速度とカーブ上の出力位置がリアルタイムで表示される
@@ -34,17 +50,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 無効化されていた Min Mouse Distance と Min Mouse Speed の設定項目を削除（既存の `config.json` にキーが残っていても読み込みに影響しない）。
 - スクロール出力の値 (Min/Max Scroll Output Speed、カーブの点、グラフの軸ラベル) を整数に統一し、小数表示をなくした
 
+**English**
+
+### Added
+- Added a live marker to the Scroll Tuning curve graph. While the modal is open, scrolling in another window shows the current input speed and the corresponding output position on the curve in real time
+
+### Fixed
+- Fixed an issue where using the Close Window action on YATS's own window terminated the app. When the target is its own window, YATS no longer sends an external close and instead hides the window, following its default tray-resident behavior
+- **Windows build error fix**: Fixed a type mismatch where a reference to a ULONG was passed as the third argument of `HidP_GetButtonCaps` (PUSHORT = `*mut u16`). As the code stood, the Windows build could not compile.
+- Reworked scroll speed measurement to be measurement-based (movement per ~8ms batch ÷ actual elapsed time). Previously the measurement interval was unstable, making the curve peaky or unresponsive. The curve is now also enabled on Windows, and the Scroll Speed slider and per-key scroll settings (sensitivity, inversion) now apply when using the curve.
+- Linux: Switched scroll and browser back/forward key sending from rdev (Xlib) to enigo (x11rb), removing a path where losing the connection to the X server could kill the process via Xlib's fatal error handler.
+- Linux: As countermeasures against the app suddenly exiting, added panic logging to the audit log, poison-tolerant locks, automatic restart of the touchpad monitoring thread, and retry on uinput initialization failure.
+
+### Changed
+- **Documentation**: Documented system requirements (supported OS, architecture, prerequisites) in the README (Japanese and English).
+- **Development**: Switched Windows builds to GitHub Actions and updated `.agent/rules.md` accordingly.
+- Unified Min/Max Scroll Output Speed as the output axis range of the Acceleration Curve. Changing the axis range now rescales the curve while preserving its shape, resolving the conflict with backend clamping.
+- Removed the disabled Min Mouse Distance and Min Mouse Speed settings (keys left in an existing `config.json` are ignored on load).
+- Unified scroll output values (Min/Max Scroll Output Speed, curve points, graph axis labels) to integers, removing decimal displays
+
 ## [1.3.7] - 2026-07-19
+
+**日本語**
 
 ### Added
 - **Windows版パームリジェクションの改善**: Windows環境において、Raw InputのHID生データ（PTP規格）を解析し、手のひらによる誤操作（Confidenceビットが0のタッチ）を直接判定して除外するロジックを実装。タイピング中などの意図しない手のひら接触によるクリック等の誤動作が防止されます。
 
+**English**
+
+### Added
+- **Improved Windows palm rejection**: On Windows, YATS now parses raw HID data from Raw Input (PTP spec) and directly detects and excludes palm touches (touches whose Confidence bit is 0). This prevents accidental clicks and other actions caused by unintended palm contact while typing.
+
 ## [1.3.6] - 2026-07-19
+
+**日本語**
 
 ### Fixed
 - **Linuxパームリジェクションの改善**: Linux環境（`evdev`）において、手のひら（パーム）がタッチパッドに触れた際に発生するイベント（`ABS_MT_TOOL_TYPE` が `MT_TOOL_PALM` となるスロット）を検知して正しくフィルタリングするようロジックを修正。タイピング中の手のひら接触による意図しないクリック等の誤動作が防止されます。
 
+**English**
+
+### Fixed
+- **Improved Linux palm rejection**: On Linux (`evdev`), the logic now correctly detects and filters events from slots whose `ABS_MT_TOOL_TYPE` is `MT_TOOL_PALM`, which occur when a palm touches the touchpad. This prevents accidental clicks and other actions caused by palm contact while typing.
+
 ## [1.3.4] - 2026-04-19
+
+**日本語**
 
 > **注意**: このバージョンはタグ・GitHub リリースが存在せず、以下の変更は v1.3.6 でまとめて公開された。本ファイルに記載のあった「1.3.5」は、実際にはバージョン番号が付与されなかった（2026-04-29 のプラットフォーム実装整理を含む）ため、ここに統合した。
 
@@ -56,20 +107,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `lib.rs` 内の Windows 固有ロジックを `platform\windows.rs` へ移動。
   - Windows のスタートアップ登録を、レジストリ方式からスタートアップフォルダへのショートカット作成方式（PowerShell経由）に統一。
   - AAPしきい値の取得・設定およびレジストリクリーンアップのロジックを `platform` モジュールに集約。
+- **ドキュメント**: README に、インストール時の Windows SmartScreen 警告（「Windows によって PC が保護されました」）への対処方法を追加（日本語・英語）。
+
+**English**
+
+> **Note**: This version has no tag or GitHub release; the changes below were published together in v1.3.6. The "1.3.5" previously listed in this file never actually had a version number assigned (including the platform implementation cleanup of 2026-04-29) and has been merged here.
+
+### Fixed
+- **Resolved unused warnings**: Fixed an issue where functions in the `platform` module were flagged as unused on Windows, by consolidating the logic in `lib.rs`.
+
+### Changed
+- **Platform implementation cleanup**:
+  - Moved Windows-specific logic from `lib.rs` into `platform\windows.rs`.
+  - Unified Windows startup registration from the registry approach to creating a shortcut in the Startup folder (via PowerShell).
+  - Consolidated the AAP threshold get/set logic and registry cleanup into the `platform` module.
 - **Documentation**: Updated README to include instructions on how to handle the Windows SmartScreen warning ("Windows protected your PC") during installation. Added both Japanese and English explanations.
 
 ## [1.3.3] - 2026-04-18
+
+**日本語**
 
 ### Changed
 - リリースワークフローに Windows ビルドを追加し、Windows 版も GitHub Releases で配布するようにした
 - About 画面のバージョン表示を更新
 
+**English**
+
+### Changed
+- Added a Windows build to the release workflow so Windows builds are also distributed via GitHub Releases
+- Updated the version display on the About screen
+
 ## [1.3.2] - 2026-04-18
+
+**日本語**
 
 ### Fixed
 - Linux で入力状態が固着（スタック）する問題を修正
 
+**English**
+
+### Fixed
+- Fixed an issue on Linux where the input state could get stuck
+
 ## [1.3.1] - 2026-03-22
+
+**日本語**
+
+### Fixed
+- **Linux のパニック修正**: `/dev/uinput` への権限がないユーザーの場合、起動時にアプリがパニック（`uinput init fail`）する問題を修正。権限エラーを適切に処理し、クラッシュせずにログへ記録するようになった
+- **ドキュメント**: Linux の仮想キーボードシミュレーション機能には `/dev/uinput` への適切な権限（udev ルール経由）が必要であることを README に明記
+- **udev ルール**: `99-yats-touchpad.rules` に `KERNEL=="uinput", MODE="0666"` ルールを追加し、`uinput` モジュールへのアクセスを自動で許可するようになった
+
+**English**
 
 ### Fixed
 - **Linux Panic Fix**: Fixed an issue where the application would panic (`uinput init fail`) on startup if the user lacked permissions for `/dev/uinput`. The app now gracefully handles the permission error and logs it instead of crashing.
@@ -77,6 +166,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Udev Rules**: Added `KERNEL=="uinput", MODE="0666"` rule to `99-yats-touchpad.rules` to automatically grant access to the `uinput` module.
 
 ## [1.3.0] - 2026-02-16
+
+**日本語**
+
+### Fixed
+- **Linux スクロールの粒度**: スクロールイベントが二重に累積され（フック側とドライバ側で1回ずつ）、複数行ジャンプが発生する問題を修正。ドライバ側のアキュムレータを削除し、スクロールイベントの 1 対 1 マッピングを可能にした
+- **タッチパッドの遅延**: Linux タッチパッドドライバの絶対位置の累積しきい値（`ACCUM_THRESHOLD`）を 8 から 1 に削減。小さな初期の動きが無視される「デッドゾーン」感を解消
+- **Linux トレイアイコン**: Zorin OS（および他の GNOME 系ディストリビューション）で「一時停止」メニュー項目の `CheckMenuItem` が正しく描画されない問題を修正。動的テキストラベル（「⏸ 一時停止」/「▶ 機能を再開」）に置き換えた
+
+### Changed
+- **デフォルトスクロールパラメータ**: ユーザーフィードバックに基づき、デフォルトのスクロール設定を更新（Sensitivity: 1、Speed: 5、Natural Scroll: On、Max Speed: 100）
+- **UI の改善**:
+  - "Natural Scroll Direction" チェックボックスを Scroll Tuning 画面の上部へ移動し、ロジックを反転（チェック = ナチュラル/非反転）
+  - より細かい調整のため "Max Scroll Output Speed" スライダーの上限を 200 に制限（従来 3000）
+  - UI を簡素化するため "Advanced Settings" ボタンを非表示にした
+  - CSS でテキスト選択を全体に無効化（`user-select: none`）
+- **パッケージメタデータ**: 生成される `.deb` パッケージに包括的なメタデータ（Homepage、License、Section、Priority）を追加
+
+**English**
 
 ### Fixed
 - **Linux Scroll Granularity**: Fixed an issue where scroll events were being accumulated redundantly (once in the hook, once in the driver), causing multi-line jumps. Removed the driver-level accumulator to allow 1-to-1 mapping of scroll events.
@@ -94,6 +201,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.2.15] - 2026-02-14
 
+**日本語**
+
 ### Added
 - **ローカル Linux ビルド環境の構築**: Docker および WSL を使用して、GitHub Actions を介さずにローカルで Linux 版バイナリ（.deb, .AppImage）をビルドできる環境を追加。
 
@@ -104,57 +213,139 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **ビルド環境のローカライズ**: `Dockerfile` やビルドスクリプト内のコメントを日本語に統一。
 
+**English**
+
+### Added
+- **Local Linux build environment**: Added an environment for building Linux binaries (.deb, .AppImage) locally using Docker and WSL, without going through GitHub Actions.
+
+### Fixed
+- **Linux build error fix**: Fixed a compile error in `keyboard_hook.rs` caused by mishandling the return value of the `uinput` builder's `with_keys`.
+- **Warning cleanup**: Renamed the unused variable `last_dir_y` in `linux.rs` to clear compile warnings.
+
+### Changed
+- **Build environment localization**: Unified comments in the `Dockerfile` and build scripts to Japanese.
+
 ## [1.2.14] - 2026-02-14
+
+**日本語**
 
 ### Fixed
 - **Linux ビルドエラーの修正**: `evdev` の Key 構文エラーによりコンパイルに失敗していた問題を修正。
 
+**English**
+
+### Fixed
+- **Linux build error fix**: Fixed a compile failure caused by an `evdev` Key syntax error.
+
 ## [1.2.13] - 2026-02-14 [YANKED]
+
+**日本語**
 
 ### Fixed
 - **設定保存の正確性向上**: 設定保存時の競合（Race Condition）を解消し、スクロール詳細設定が確実に保存されるように修正。
 - **注意**: このバージョンはビルドエラーのため使用できません。v1.2.14 を使用してください。
 
+**English**
+
+### Fixed
+- **More reliable config saving**: Resolved a race condition when saving settings, so scroll tuning settings are now saved reliably.
+- **Note**: This version is unusable due to a build error. Please use v1.2.14.
+
 ## [1.2.12] - 2026-02-14 [YANKED]
+
+**日本語**
 
 ### Changed
 - **Linux スクロール設定の統合**: 「Global Scroll Settings」と「Linux Scroll Tuning (Curve)」画面を統合。感度曲線（Curve）を基本モデルとし、UIを簡略化。
 - **UIの改善**: `Max Scroll Output Speed` を感度曲線の y 軸上限と連動。設定項目（Sensitivity, Scroll Speed, Min Mouse Speed）を固定値化し UI から削除。
 - **注意**: このバージョンはビルドエラーのため使用できません。v1.2.13 を使用してください。
 
+**English**
+
+### Changed
+- **Unified Linux scroll settings**: Merged the "Global Scroll Settings" and "Linux Scroll Tuning (Curve)" screens. The sensitivity curve (Curve) is now the basic model, and the UI was simplified.
+- **UI improvements**: Linked `Max Scroll Output Speed` to the y-axis limit of the sensitivity curve. The settings (Sensitivity, Scroll Speed, Min Mouse Speed) were fixed in value and removed from the UI.
+- **Note**: This version is unusable due to a build error. Please use v1.2.13.
+
 ## [1.2.11] - 2026-02-14
+
+**日本語**
 
 ### Fixed
 - **Linux マウスロック問題の修正**: キーボードフック対象の自動判定ロジックを強化。相対/絶対座標を持つのポインティングデバイス（マウス・タッチパッド）を明示的に除外することで、起動時にマウスが操作不能になる問題を修正。
 
+**English**
+
+### Fixed
+- **Linux mouse lock fix**: Strengthened the automatic detection of keyboard hook targets. Pointing devices with relative/absolute coordinates (mice, touchpads) are now explicitly excluded, fixing an issue where the mouse became unusable at startup.
+
 ## [1.2.10] - 2026-02-14
+
+**日本語**
 
 ### Fixed
 - **Linux ビルド構成の修正**: `evdev` クレートの `uinput` フィーチャー指定を削除（v0.12 では不要なため）。これにより依存関係の解決エラーを修正。
 
+**English**
+
+### Fixed
+- **Linux build configuration fix**: Removed the `uinput` feature specification from the `evdev` crate (not required in v0.12), fixing a dependency resolution error.
+
 ## [1.2.9] - 2026-02-14
+
+**日本語**
 
 ### Fixed
 - **Linux ビルド環境への対応強化**: `evdev` の `uinput` ビルダーおよび `AttributeSet` の操作方法を、より互換性の高い構文に修正。
 
+**English**
+
+### Fixed
+- **Stronger Linux build support**: Rewrote the `evdev` `uinput` builder and `AttributeSet` operations in a more compatible syntax.
+
 ## [1.2.8] - 2026-02-14
+
+**日本語**
 
 ### Fixed
 - **Linux ビルドエラーの修正**: `evdev` クレートの `uinput` フィーチャーが不足していたため、GitHub Actions でのコンパイルに失敗していた問題を修正。
 
+**English**
+
+### Fixed
+- **Linux build error fix**: Fixed a GitHub Actions compile failure caused by a missing `uinput` feature in the `evdev` crate.
+
 ## [1.2.7] - 2026-02-14
+
+**日本語**
 
 ### Fixed
 - **Linux キーボード無反応問題の修正**: キーボードの排他制御（Grab）時に、リマップ対象外のイベントを物理デバイスへ戻すのではなく、`/dev/uinput` による仮想キーボード経由でOSへ再注入するように改善。これにより、アプリ起動中にマウスやキーボードが操作不能になる問題を根本解決。
 
+**English**
+
+### Fixed
+- **Linux keyboard unresponsiveness fix**: When grabbing a keyboard exclusively, events not subject to remapping are now re-injected into the OS through a virtual keyboard via `/dev/uinput`, instead of being returned to the physical device. This fundamentally fixes the issue where the mouse and keyboard became unusable while the app was running.
+
 ## [1.2.6] - 2026-02-14
+
+**日本語**
 
 ### Fixed
 - **Linux スリープ復帰時の不具合修正**: Linux版のキーボードフックを X11 ベースの `rdev` からカーネルレベルの `evdev` 直接監視に移行。
   - セッション切断の影響を受けなくなり、スリープ復帰時も自動的にデバイスを再検知して動作を継続するよう改善。
   - キーボードデバイスの排他取得（Grab）により、より低遅延で安定したリマップを実現。
 
+**English**
+
+### Fixed
+- **Linux sleep/resume fix**: Migrated the Linux keyboard hook from the X11-based `rdev` to direct kernel-level `evdev` monitoring.
+  - No longer affected by session disconnects; devices are automatically re-detected after resuming from sleep so operation continues.
+  - Exclusive device grab (Grab) enables lower-latency, more stable remapping.
+
 ## [1.2.5] - 2026-02-14
+
+**日本語**
 
 ### Fixed
 - **スクロール速度反映の修正**: 計算ロジック内の不要な係数を削除し、カーブエディタで設定した出力速度が正確に反映されるように修正。
@@ -163,7 +354,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **感度曲線の平滑化**: カーブエディタの補間アルゴリズムを線形からスプライン曲線（Monotone Cubic Spline）に変更。つなぎ目がなだらかになり、より直感的なチューニングが可能。
 - **UIのブラッシュアップ**: グラフの描画品質向上、目盛りラベルの追加、グリッドの調整。
 
+**English**
+
+### Fixed
+- **Scroll speed application fix**: Removed an unnecessary factor from the calculation logic so the output speed set in the curve editor is applied accurately.
+
+### Changed
+- **Smoother sensitivity curve**: Changed the curve editor's interpolation algorithm from linear to a spline curve (Monotone Cubic Spline), making joins smoother and tuning more intuitive.
+- **UI polish**: Improved graph rendering quality, added tick labels, and adjusted the grid.
+
 ## [1.2.4] - 2026-02-14
+
+**日本語**
 
 ### Added
 - **スクロール感度曲線（カーブエディタ）**: マウスの移動速度に対するスクロール速度をグラフ上で直感的に設定できる機能を追加（Linux版）。
@@ -171,7 +373,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 従来の線形設定（Standard）と感度曲線（Advanced）をいつでも切り替え可能。
 - **データ構造の拡張**: `AppConfig` にカーブデータ保持用のフィールドを追加。
 
+**English**
+
+### Added
+- **Scroll sensitivity curve (Curve Editor)**: Added a feature to intuitively set scroll speed relative to mouse movement speed on a graph (Linux).
+  - Supports dragging points, adding by click, and deleting by right-click.
+  - The conventional linear setting (Standard) and the sensitivity curve (Advanced) can be switched at any time.
+- **Data structure extension**: Added fields to `AppConfig` for holding curve data.
+
 ## [1.2.3] - 2026-02-14
+
+**日本語**
 
 ### Fixed
 - **Linuxスクロール不具合の修正**: 速度制限（クランプ）がかかった際に微小な移動量が切り捨てられる問題を、OS側送信関数への累積器（アキュムレータ）導入により解決。
@@ -180,13 +392,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **UIの改善 (別画面化)**: `Global Scroll Settings` モーダルからLinux専用詳細設定を分離。新設した `Linux Scroll Tuning` モーダルへ移動し、UIのオーバーフローを解消。
 - **デフォルト値の調整**: `Max Scroll Output Speed` の初期値を 300 から 800 へ引き上げ。
 
+**English**
+
+### Fixed
+- **Linux scroll fix**: Resolved an issue where small movements were truncated when the speed limit (clamp) applied, by adding an accumulator to the OS-level sending function.
+
+### Changed
+- **UI improvement (separate screen)**: Separated the Linux-only advanced settings from the `Global Scroll Settings` modal into a new `Linux Scroll Tuning` modal, resolving UI overflow.
+- **Default adjustment**: Raised the default of `Max Scroll Output Speed` from 300 to 800.
+
 ## [1.2.2] - 2026-02-13
+
+**日本語**
 
 ### Added
 - **Linux専用スクロール詳細設定**: 移動量、速度、最小/最大出力速度のチューニング項目を `AppConfig` および UI に追加。
 - **スクロールロジックの改善 (Linux)**: しきい値を超えるまで入力を抑制する「遊び」と、出力範囲のクランプ機能を実装。
 
+**English**
+
+### Added
+- **Linux-only scroll tuning settings**: Added tuning items for movement amount, speed, and minimum/maximum output speed to `AppConfig` and the UI.
+- **Scroll logic improvements (Linux)**: Implemented a "play" (deadzone) that suppresses input until a threshold is exceeded, and output range clamping.
+
 ## [1.2.1] - 2026-02-10
+
+**日本語**
 
 ### Changed
 - **大規模リファクタリング**: Windows と Linux のプラットフォーム固有コードを専用モジュールに分離
@@ -205,9 +436,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 入力シミュレーション、ウィンドウ管理、システム情報取得のための統一インターフェース（トレイト）を実装
 - プラットフォーム固有の処理を抽象化し、将来的な拡張を容易に
 
+**English**
+
+### Changed
+- **Major refactoring**: Separated Windows- and Linux-specific code into dedicated modules
+  - Created a new `platform` module structure (`platform/windows.rs`, `platform/linux.rs`)
+  - Separated the touchpad monitoring implementation into `platform/touchpad/`
+  - Reduced `touchpad_monitor.rs` from 615 lines to 155 (75% reduction)
+  - Reduced `keyboard_hook.rs` from 496 lines to 290 (42% reduction)
+  - Reduced `lib.rs` from 534 lines to 440 (18% reduction)
+  - Greatly reduced conditional compilation (`#[cfg]`) blocks
+- Code maintainability and readability improved
+
+### Fixed
+- **Linux hook recovery after sleep**: The keyboard hook (rdev::grab) now retries automatically if it fails after resuming from sleep/suspend.
+
+### Technical Details
+- Implemented unified interfaces (traits) for input simulation, window management, and system information retrieval
+- Abstracted platform-specific processing, making future extension easier
+
 ---
 
 ## [1.2.0] - 2026-02-10
+
+**日本語**
 
 ### Added
 - **Linux 版の正式サポート**: Ubuntu / Linux Mint などで動作する Linux 版を追加し、GitHub Releases で .deb / AppImage の配布を開始。タッチパッド検出の改善（除外キーワードによるキーボード誤検出の防止、Apple MacBook の bcm5974 タッチパッド対応）、udev ルールによるデバイスアクセス権限の設定、xdotool によるウィンドウ操作を含む
@@ -217,7 +469,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Linux のスクロールを Windows と同様の線形な挙動に改善。スムージング（デッドゾーン、アキュムレータ、方向ヒステリシス）と移動量のクランプ・フィルタリングにより、スクロールのジャンプや飛びを防止
 - Linux のタッチパッド監視スレッドに panic ハンドリングとログ出力を追加し、起動時の問題を追跡可能にした
 
+**English**
+
+### Added
+- **Official Linux support**: Added a Linux version that runs on Ubuntu, Linux Mint, and similar systems, and started distributing .deb / AppImage binaries via GitHub Releases. Includes improved touchpad detection (preventing keyboard misdetection via exclusion keywords, support for the Apple MacBook bcm5974 touchpad), device access permissions via udev rules, and window operations via xdotool
+- **Scroll Speed setting**: Added a scroll speed setting (10–500%) independent of Sensitivity
+
+### Fixed
+- Made Linux scrolling linear, like Windows. Smoothing (deadzone, accumulator, direction hysteresis) and clamping/filtering of movement prevent scroll jumps and skips
+- Added panic handling and logging to the Linux touchpad monitoring thread, making startup problems traceable
+
 ## [1.1.0] - 2026-02-06
+
+**日本語**
 
 ### Changed
 - ブランディングの洗練（名称・アイコンまわりの整理）
@@ -225,7 +489,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - スタートアップ登録の状態とアプリ表示の同期を改善
 - シェルウィンドウの表示ガードを追加
 
+**English**
+
+### Changed
+- Refined branding (name, icons, and related elements)
+- Enlarged the main window to 800x600 and adjusted the UI layout
+- Improved synchronization between the startup registration state and the app display
+- Added a guard for shell window display
+
 ## [1.0.1] - 2026-02-04
+
+**日本語**
 
 ### Added
 - ライセンス（LICENSE）ファイルを追加
@@ -233,7 +507,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - スクロールの挙動を修正
 
+**English**
+
+### Added
+- Added the license (LICENSE) file
+
+### Fixed
+- Fixed scroll behavior
+
 ## [1.0.0] - 2026-02-04
+
+**日本語**
 
 ### Added
 - 初の正式リリース。タッチパッドの操作をトリガーに、あらかじめ割り当てたアクションを実行する
@@ -242,3 +526,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - ウィンドウ操作 (閉じる、最大化/元に戻す、移動)
   - スクロール
 - 本バージョンは、復元された v0.4.8 のコードベースを基に整備したもの
+
+**English**
+
+### Added
+- First official release. Performs pre-assigned actions triggered by touchpad operations
+  - Mouse clicks (Left, Right, Middle, Double Click)
+  - Keyboard macros
+  - Window operations (Close, Maximize/Restore, Move)
+  - Scrolling
+- This version was prepared based on the restored v0.4.8 codebase
