@@ -12,6 +12,15 @@ pub use linux::*;
 pub use windows::*;
 
 use crate::config::{MouseButton, WindowAction};
+use crate::touchpad_monitor::TouchpadMonitor;
+
+#[cfg(target_os = "windows")]
+use std::sync::Mutex;
+#[cfg(target_os = "windows")]
+use winapi::shared::windef::RECT;
+
+#[cfg(target_os = "windows")]
+static SAVED_CLIP: Mutex<Option<RECT>> = Mutex::new(None);
 
 /// Platform-specific input simulation
 pub trait InputSimulation {
@@ -100,6 +109,64 @@ pub fn set_cursor_pos(x: i32, y: i32) {
     if let Ok(mut enigo) = Enigo::new(&Settings::default()) {
         let _ = enigo.move_mouse(x, y, Coordinate::Abs);
     }
+}
+
+#[cfg(target_os = "windows")]
+pub fn cursor_freeze_begin(_monitor: &TouchpadMonitor, anchor: (i32, i32)) {
+    use winapi::um::winuser::{ClipCursor, GetClipCursor};
+
+    let mut saved_clip = crate::lock_unpoison(&SAVED_CLIP);
+    unsafe {
+        if saved_clip.is_none() {
+            let mut rect: RECT = std::mem::zeroed();
+            if GetClipCursor(&mut rect) != 0 {
+                *saved_clip = Some(rect);
+            }
+        }
+
+        let clip = RECT {
+            left: anchor.0,
+            top: anchor.1,
+            right: anchor.0 + 1,
+            bottom: anchor.1 + 1,
+        };
+        ClipCursor(&clip);
+    }
+}
+
+#[cfg(target_os = "linux")]
+pub fn cursor_freeze_begin(monitor: &TouchpadMonitor, _anchor: (i32, i32)) {
+    monitor
+        .state
+        .cursor_freeze
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+#[cfg(target_os = "windows")]
+fn restore_cursor_clip() {
+    let mut saved_clip = crate::lock_unpoison(&SAVED_CLIP);
+    let clip = saved_clip.take();
+    unsafe {
+        winapi::um::winuser::ClipCursor(clip.as_ref().map_or(std::ptr::null(), |rect| rect));
+    }
+}
+
+#[cfg(target_os = "windows")]
+pub fn cursor_freeze_end(_monitor: &TouchpadMonitor) {
+    restore_cursor_clip();
+}
+
+#[cfg(target_os = "linux")]
+pub fn cursor_freeze_end(monitor: &TouchpadMonitor) {
+    monitor
+        .state
+        .cursor_freeze
+        .store(false, std::sync::atomic::Ordering::SeqCst);
+}
+
+pub fn cursor_freeze_reset() {
+    #[cfg(target_os = "windows")]
+    restore_cursor_clip();
 }
 
 // Platform-specific touchpad monitoring

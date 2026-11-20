@@ -144,7 +144,11 @@ impl HookWorker {
                         self.active_scroll = cfg;
                         if self.active_scroll.is_some() {
                             self.scroll_anchor = platform::get_cursor_pos();
+                            if let Some(anchor) = self.scroll_anchor {
+                                platform::cursor_freeze_begin(&self.monitor, anchor);
+                            }
                         } else {
+                            platform::cursor_freeze_end(&self.monitor);
                             self.scroll_anchor = None;
                         }
                         self.accumulator_y = 0.0;

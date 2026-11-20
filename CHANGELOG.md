@@ -11,6 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**日本語**
+
+### Fixed
+- スクロール中にマウスカーソルが一瞬移動して元の位置に戻るちらつきを修正。カーソルを事後的に戻すのではなく、スクロール中はカーソルが動かないようにした（Linux: タッチパッドデバイスをグラブして入力を OS へ渡さない。Windows: カーソルをスクロール開始位置にクリップ）
+
+### Changed
+- トレイアイコンのツールチップ（ホバー表示）を「YATS」から「YATS Ver. X.X.X」（現在のバージョン番号）へ変更
+
+**English**
+
+### Fixed
+- Fixed the mouse cursor flickering during scroll, where it momentarily moved and snapped back. Instead of moving the cursor back after the fact, the cursor is now kept from moving during scroll (Linux: the touchpad device is grabbed so its input does not reach the OS. Windows: the cursor is clipped to the scroll start position)
+
+### Changed
+- Changed the tray icon tooltip (hover text) from "YATS" to "YATS Ver. X.X.X" (the current version number)
+
 ## [1.3.9] - 2026-11-20
 
 **日本語**

@@ -10,6 +10,7 @@ use crate::platform::touchpad::SendHwnd;
 
 pub struct MonitorState {
     pub is_touched: AtomicBool,
+    pub cursor_freeze: AtomicBool,
     pub last_touch_time: Mutex<std::time::Instant>,
     pub x_delta: AtomicI32,
     pub y_delta: AtomicI32,
@@ -30,6 +31,7 @@ impl TouchpadMonitor {
         audit_log("[MONITOR] TouchpadMonitor::new() called - initializing");
         let state = Arc::new(MonitorState {
             is_touched: AtomicBool::new(false),
+            cursor_freeze: AtomicBool::new(false),
             last_touch_time: Mutex::new(
                 std::time::Instant::now() - std::time::Duration::from_secs(10),
             ),

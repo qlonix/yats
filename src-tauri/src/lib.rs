@@ -296,11 +296,14 @@ pub fn run() {
 
             let _tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
-                .tooltip("YATS")
+                .tooltip(format!("YATS Ver. {}", env!("CARGO_PKG_VERSION")))
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
-                    "quit" => app.exit(0),
+                    "quit" => {
+                        crate::platform::cursor_freeze_reset();
+                        app.exit(0);
+                    }
                     "settings" => {
                         if let Some(window) = app.get_webview_window("main") {
                             let _ = window.show().ok();

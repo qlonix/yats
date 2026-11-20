@@ -126,9 +126,35 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
     const ABS_MT_TOOL_TYPE: u16 = 0x37;
     const ABS_MT_TRACKING_ID: u16 = 0x39;
 
+    let mut grabbed = false;
+    let mut pending_events = Vec::new();
     loop {
-        if let Ok(events) = device.fetch_events() {
-            for ev in events {
+        // グラブの切り替え前にイベントイテレータのデバイス借用を終える。
+        let fetched = device
+            .fetch_events()
+            .map(|events| pending_events.extend(events));
+        if fetched.is_ok() {
+            if state.cursor_freeze.load(Ordering::SeqCst) {
+                if !grabbed {
+                    match device.grab() {
+                        Ok(()) => {
+                            grabbed = true;
+                            crate::audit_log("[FREEZE] touchpad grabbed");
+                        }
+                        Err(e) => crate::audit_log(&format!("[FREEZE] touchpad grab failed: {e}")),
+                    }
+                }
+            } else if grabbed {
+                match device.ungrab() {
+                    Ok(()) => {
+                        grabbed = false;
+                        crate::audit_log("[FREEZE] touchpad ungrabbed");
+                    }
+                    Err(e) => crate::audit_log(&format!("[FREEZE] touchpad ungrab failed: {e}")),
+                }
+            }
+
+            for ev in pending_events.drain(..) {
                 let ev_type = ev.event_type();
 
                 // Process slot/palm tracking first
