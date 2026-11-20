@@ -44,7 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Linuxパームリジェクションの改善**: Linux環境（`evdev`）において、手のひら（パーム）がタッチパッドに触れた際に発生するイベント（`ABS_MT_TOOL_TYPE` が `MT_TOOL_PALM` となるスロット）を検知して正しくフィルタリングするようロジックを修正。タイピング中の手のひら接触による意図しないクリック等の誤動作が防止されます。
 
-## [1.3.5] - 2026-04-29
+## [1.3.4] - 2026-04-19
+
+> **注意**: このバージョンはタグ・GitHub リリースが存在せず、以下の変更は v1.3.6 でまとめて公開された。本ファイルに記載のあった「1.3.5」は、実際にはバージョン番号が付与されなかった（2026-04-29 のプラットフォーム実装整理を含む）ため、ここに統合した。
 
 ### Fixed
 - **未使用警告の解消**: Windows環境で `platform` モジュールの関数が未使用と判定されていた問題を、`lib.rs` のロジックを統合・集約することで解消。
@@ -54,11 +56,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `lib.rs` 内の Windows 固有ロジックを `platform\windows.rs` へ移動。
   - Windows のスタートアップ登録を、レジストリ方式からスタートアップフォルダへのショートカット作成方式（PowerShell経由）に統一。
   - AAPしきい値の取得・設定およびレジストリクリーンアップのロジックを `platform` モジュールに集約。
+- **Documentation**: Updated README to include instructions on how to handle the Windows SmartScreen warning ("Windows protected your PC") during installation. Added both Japanese and English explanations.
 
-## [1.3.4] - 2026-04-19
+## [1.3.3] - 2026-04-18
 
 ### Changed
-- **Documentation**: Updated README to include instructions on how to handle the Windows SmartScreen warning ("Windows protected your PC") during installation. Added both Japanese and English explanations.
+- リリースワークフローに Windows ビルドを追加し、Windows 版も GitHub Releases で配布するようにした
+- About 画面のバージョン表示を更新
+
+## [1.3.2] - 2026-04-18
+
+### Fixed
+- Linux で入力状態が固着（スタック）する問題を修正
 
 ## [1.3.1] - 2026-03-22
 
@@ -95,6 +104,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **ビルド環境のローカライズ**: `Dockerfile` やビルドスクリプト内のコメントを日本語に統一。
 
+## [1.2.14] - 2026-02-14
+
+### Fixed
+- **Linux ビルドエラーの修正**: `evdev` の Key 構文エラーによりコンパイルに失敗していた問題を修正。
+
 ## [1.2.13] - 2026-02-14 [YANKED]
 
 ### Fixed
@@ -108,6 +122,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **UIの改善**: `Max Scroll Output Speed` を感度曲線の y 軸上限と連動。設定項目（Sensitivity, Scroll Speed, Min Mouse Speed）を固定値化し UI から削除。
 - **注意**: このバージョンはビルドエラーのため使用できません。v1.2.13 を使用してください。
 
+## [1.2.11] - 2026-02-14
 
 ### Fixed
 - **Linux マウスロック問題の修正**: キーボードフック対象の自動判定ロジックを強化。相対/絶対座標を持つのポインティングデバイス（マウス・タッチパッド）を明示的に除外することで、起動時にマウスが操作不能になる問題を修正。
@@ -183,12 +198,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 条件付きコンパイル（`#[cfg]`）ブロックを大幅に削減
 - コードの保守性と可読性が向上
 
+### Fixed
+- **Linux スリープ復帰時のフック回復**: スリープ/サスペンドから復帰した後にキーボードフック（rdev::grab）が失敗した場合、自動でリトライするよう修正。
+
 ### Technical Details
 - 入力シミュレーション、ウィンドウ管理、システム情報取得のための統一インターフェース（トレイト）を実装
 - プラットフォーム固有の処理を抽象化し、将来的な拡張を容易に
 
 ---
 
-## [1.2.0] - 以前のバージョン
+## [1.2.0] - 2026-02-10
 
-過去のバージョンの変更履歴は追って記載予定
+### Added
+- **Linux 版の正式サポート**: Ubuntu / Linux Mint などで動作する Linux 版を追加し、GitHub Releases で .deb / AppImage の配布を開始。タッチパッド検出の改善（除外キーワードによるキーボード誤検出の防止、Apple MacBook の bcm5974 タッチパッド対応）、udev ルールによるデバイスアクセス権限の設定、xdotool によるウィンドウ操作を含む
+- **Scroll Speed 設定**: Sensitivity とは独立したスクロール速度の設定（10〜500%）を追加
+
+### Fixed
+- Linux のスクロールを Windows と同様の線形な挙動に改善。スムージング（デッドゾーン、アキュムレータ、方向ヒステリシス）と移動量のクランプ・フィルタリングにより、スクロールのジャンプや飛びを防止
+- Linux のタッチパッド監視スレッドに panic ハンドリングとログ出力を追加し、起動時の問題を追跡可能にした
+
+## [1.1.0] - 2026-02-06
+
+### Changed
+- ブランディングの洗練（名称・アイコンまわりの整理）
+- メインウィンドウのサイズを 800x600 に拡大し、UI レイアウトを調整
+- スタートアップ登録の状態とアプリ表示の同期を改善
+- シェルウィンドウの表示ガードを追加
+
+## [1.0.1] - 2026-02-04
+
+### Added
+- ライセンス（LICENSE）ファイルを追加
+
+### Fixed
+- スクロールの挙動を修正
+
+## [1.0.0] - 2026-02-04
+
+### Added
+- 初の正式リリース。タッチパッドの操作をトリガーに、あらかじめ割り当てたアクションを実行する
+  - マウスクリック (左、右、中、ダブルクリック)
+  - キーボードマクロ
+  - ウィンドウ操作 (閉じる、最大化/元に戻す、移動)
+  - スクロール
+- 本バージョンは、復元された v0.4.8 のコードベースを基に整備したもの
