@@ -290,7 +290,14 @@ pub fn run() {
             let quit_i = MenuItem::with_id(app, "quit", "終了", true, None::<&str>)?;
             let settings_i = MenuItem::with_id(app, "settings", "設定", true, None::<&str>)?;
             let pause_i = MenuItem::with_id(app, "pause", "⏸ 一時停止", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&settings_i, &pause_i, &quit_i])?;
+            let version_i = MenuItem::with_id(
+                app,
+                "version",
+                format!("Ver. {}", env!("CARGO_PKG_VERSION")),
+                false,
+                None::<&str>,
+            )?;
+            let menu = Menu::with_items(app, &[&settings_i, &pause_i, &quit_i, &version_i])?;
 
             let _ = PAUSE_MENU_ITEM.set(pause_i.clone());
 

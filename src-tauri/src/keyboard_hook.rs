@@ -282,7 +282,7 @@ impl KeyboardHook {
                                         now.duration_since(last_time).as_millis()
                                             < cfg.palm_rejection_delay_ms as u128
                                             || monitor_inner
-                                                .touch_started_at()
+                                                .contact_started_at()
                                                 .is_some_and(|started_at| started_at < last_time)
                                     } else {
                                         false
@@ -303,6 +303,7 @@ impl KeyboardHook {
                             if should_trigger {
                                 keys.insert(key);
                                 if let Some(action) = action {
+                                    crate::audit_log(&format!("[TRIGGER] key={key:?} fired"));
                                     match action {
                                         Action::MouseScroll(cfg) => {
                                             monitor_inner.consume_y_delta();
@@ -317,6 +318,9 @@ impl KeyboardHook {
                                     return None;
                                 }
                             } else {
+                                if action.is_some() && touched && is_palm_rejected {
+                                    crate::audit_log(&format!("[PALM] key={key:?} rejected"));
+                                }
                                 *lock_unpoison(&last_typing_inner) = Some(now);
                             }
                         }
@@ -500,7 +504,7 @@ impl KeyboardHook {
                                                                 < cfg.palm_rejection_delay_ms
                                                                     as u128
                                                                 || monitor_inner
-                                                                    .touch_started_at()
+                                                                    .contact_started_at()
                                                                     .is_some_and(|started_at| {
                                                                         started_at < last_time
                                                                     })
@@ -534,6 +538,9 @@ impl KeyboardHook {
                                                         cfg.mappings.get(&rkey).cloned()
                                                     };
                                                     if let Some(action) = action {
+                                                        crate::audit_log(&format!(
+                                                            "[TRIGGER] key={rkey:?} fired"
+                                                        ));
                                                         pressed_keys.insert(rkey, action.clone());
                                                         match action {
                                                             Action::MouseScroll(cfg) => {
@@ -556,6 +563,16 @@ impl KeyboardHook {
                                                         continue;
                                                     }
                                                 } else {
+                                                    if is_remap
+                                                        && touched
+                                                        && !paused
+                                                        && !simulating
+                                                        && is_palm_rejected
+                                                    {
+                                                        crate::audit_log(&format!(
+                                                            "[PALM] key={rkey:?} rejected"
+                                                        ));
+                                                    }
                                                     *lock_unpoison(&last_typing_inner) = Some(now);
                                                 }
                                             }

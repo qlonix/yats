@@ -16,20 +16,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - スクロール中にマウスカーソルが一瞬移動して元の位置に戻るちらつきを修正。カーソルを事後的に戻すのではなく、スクロール中はカーソルが動かないようにした（Linux: タッチパッドデバイスをグラブして入力を OS へ渡さない。Windows: カーソルをスクロール開始位置にクリップ）
 - パームリジェクションを強化。タイピングを始める前からタッチパッドに触れ続けている接触（置かれた手のひらなど）ではアクションが発火しないようにした。Linux では接触面積 (ABS_MT_TOUCH_MAJOR) によるパーム判定も追加（対応デバイスのみ）
+- パームリジェクションの接触判定を改良。接触開始時刻をタッチパッドの接触状態 (evdev の TRACKING_ID / BTN_TOUCH) から取るようにし、タイピング前から置かれている手のひらがわずかに動いても、新規の接触と誤認せず抑止が続くようにした
 
 ### Changed
 - トレイアイコンのツールチップ（ホバー表示）を「YATS」から「YATS Ver. X.X.X」（現在のバージョン番号）へ変更
 - Linux でもトレイアイコンのバージョンが見えるようにした。Linux のトレイ実装ではツールチップがサポートされないため、「YATS Ver. X.X.X」をアイコン横のラベルにも表示する（Windows では従来どおりツールチップに表示）
+- トレイアイコンの右クリックメニューの一番下に「Ver. X.X.X」（現在のバージョン）を表示するようにした
 
 **English**
 
 ### Fixed
 - Fixed the mouse cursor flickering during scroll, where it momentarily moved and snapped back. Instead of moving the cursor back after the fact, the cursor is now kept from moving during scroll (Linux: the touchpad device is grabbed so its input does not reach the OS. Windows: the cursor is clipped to the scroll start position)
 - Strengthened palm rejection. A touch that was already in contact before typing started (such as a resting palm) no longer triggers actions. On Linux, palms are also detected by contact size (ABS_MT_TOUCH_MAJOR) on devices that report it
+- Improved the palm rejection contact tracking. The contact start time is now taken from the touchpad's actual contact state (evdev TRACKING_ID / BTN_TOUCH), so a palm that rests on the pad from before typing is not mistaken for a fresh touch when it shifts slightly, and stays rejected
 
 ### Changed
 - Changed the tray icon tooltip (hover text) from "YATS" to "YATS Ver. X.X.X" (the current version number)
 - Made the tray icon version visible on Linux as well. Tooltips are not supported by the Linux tray implementation, so "YATS Ver. X.X.X" is also shown as a label next to the icon (on Windows it appears in the tooltip as before)
+- Added the current version ("Ver. X.X.X") at the bottom of the tray icon's right-click menu
 
 ## [1.3.9] - 2026-11-20
 

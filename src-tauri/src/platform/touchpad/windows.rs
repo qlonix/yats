@@ -91,7 +91,7 @@ pub unsafe extern "system" fn wnd_proc(
                     if let Ok(mut last_time) = state.last_touch_time.lock() {
                         let now = std::time::Instant::now();
                         *last_time = now;
-                        if let Ok(mut start_time) = state.touch_start_time.lock() {
+                        if let Ok(mut start_time) = state.contact_start_time.lock() {
                             start_time.get_or_insert(now);
                         }
                         state.is_touched.store(true, Ordering::SeqCst);

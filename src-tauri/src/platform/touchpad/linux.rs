@@ -140,6 +140,8 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
 
     // Track touch slots and palm state
     let mut current_slot: usize = 0;
+    let mut slot_active = [false; 16];
+    let mut st_contact = false;
     let mut slot_is_palm = [false; 16];
     let mut slot_major_palm = [false; 16];
 
@@ -147,6 +149,7 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
     const ABS_MT_TOOL_TYPE: u16 = AbsoluteAxisType::ABS_MT_TOOL_TYPE.0;
     const ABS_MT_TOUCH_MAJOR: u16 = AbsoluteAxisType::ABS_MT_TOUCH_MAJOR.0;
     const ABS_MT_TRACKING_ID: u16 = 0x39;
+    const BTN_TOUCH: u16 = 330;
 
     let mut grabbed = false;
     let mut pending_events = Vec::new();
@@ -179,6 +182,14 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
             for ev in pending_events.drain(..) {
                 let ev_type = ev.event_type();
 
+                let value = ev.value();
+                let contact_event = (ev_type == EventType::ABSOLUTE
+                    && ev.code() == ABS_MT_TRACKING_ID
+                    && value >= -1)
+                    || (ev_type == EventType::KEY
+                        && ev.code() == BTN_TOUCH
+                        && matches!(value, 0 | 1));
+
                 // Process slot/palm tracking first
                 if ev_type == EventType::ABSOLUTE {
                     let code = ev.code();
@@ -188,12 +199,12 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                             current_slot = slot;
                         }
                     } else if code == ABS_MT_TRACKING_ID {
-                        if ev.value() == -1 {
-                            // Touch released for this slot
-                            if current_slot < slot_is_palm.len() {
-                                slot_is_palm[current_slot] = false;
-                                slot_major_palm[current_slot] = false;
-                            }
+                        if value >= 0 {
+                            slot_active[current_slot] = true;
+                        } else if value == -1 {
+                            slot_active[current_slot] = false;
+                            slot_is_palm[current_slot] = false;
+                            slot_major_palm[current_slot] = false;
                         }
                     } else if code == ABS_MT_TOOL_TYPE {
                         // MT_TOOL_PALM = 2
@@ -217,6 +228,8 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                             slot_major_palm[current_slot] = true;
                         }
                     }
+                } else if contact_event {
+                    st_contact = value == 1;
                 }
 
                 if ev_type == EventType::ABSOLUTE
@@ -231,14 +244,24 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                         slot_is_palm.iter().chain(&slot_major_palm).any(|&p| p)
                     };
 
-                    if !is_palm {
+                    if !is_palm || contact_event {
                         if let Ok(mut last_time) = state.last_touch_time.lock() {
                             let now = std::time::Instant::now();
-                            *last_time = now;
-                            if let Ok(mut start_time) = state.touch_start_time.lock() {
-                                start_time.get_or_insert(now);
+                            if contact_event {
+                                let any_active =
+                                    slot_active.iter().any(|&active| active) || st_contact;
+                                if let Ok(mut start_time) = state.contact_start_time.lock() {
+                                    if any_active {
+                                        start_time.get_or_insert(now);
+                                    } else {
+                                        *start_time = None;
+                                    }
+                                }
                             }
-                            state.is_touched.store(true, Ordering::SeqCst);
+                            if !is_palm {
+                                *last_time = now;
+                                state.is_touched.store(true, Ordering::SeqCst);
+                            }
                         }
                     }
 
