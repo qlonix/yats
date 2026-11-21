@@ -5541,6 +5541,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "winapi",
  "winreg 0.52.0",
+ "x11rb",
 ]
 
 [[package]]

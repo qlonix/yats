@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **日本語**
 
+### Added
+- アクション種別「Window Drag」を追加。本家の ThumbSense と同様に、カーソルが対象ウィンドウの中にあればタイトルバー以外でも、トリガーキーを押しながらタッチパッドを動かすとウィンドウを移動できる。対象ウィンドウが最大化されている場合は最大化を解除してから移動する。Linux は X11 セッションのみ対応（Wayland では仕様上利用できない）
+
+**English**
+
+### Added
+- New "Window Drag" action: like the original ThumbSense, holding the trigger key and moving on the touchpad drags the window under the cursor from anywhere inside it, not just the title bar. A maximized target window is restored first, then dragged. On Linux this works in X11 sessions only (not possible on Wayland by design)
+
+**日本語**
+
 ### Fixed
 - Windows で、しばらく使うとクリックやスクロールが一切効かなくなる問題を修正。接触開始時刻がマウス移動などの活動でも記録されていたため、最初のタイピング以降は「接触の方が先」と判定され続け、すべてのアクションがパームリジェクションで抑止されていた。接触の開始・終了を HID レポートの接触遷移（指が触れた／離れた）だけで管理するよう変更した
 - パームリジェクションの監査ログに抑止理由（recent typing / stale contact）を記録するようにした

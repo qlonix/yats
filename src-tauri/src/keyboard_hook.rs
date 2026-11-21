@@ -29,6 +29,7 @@ pub struct KeyboardHook {
 pub enum RemapCommand {
     Execute(Action, bool),
     UpdateScroll(Option<ScrollConfig>),
+    UpdateDrag(bool),
 }
 
 const VK_BROWSER_BACK: u16 = 0xA6;
@@ -90,6 +91,7 @@ fn execute_action(action: Action, pressed: bool, app: &Mutex<Option<AppHandle>>)
             platform::execute_window_action(win_act);
         }
         Action::Window(_) => {}
+        Action::WindowDrag => {}
         Action::BrowserBack => {
             platform::send_key_click(VK_BROWSER_BACK, pressed);
         }
@@ -119,6 +121,10 @@ pub struct HookWorker {
     accumulator_y: f32,
     pending_y: f32,
     last_scroll_time: std::time::Instant,
+    drag_active: bool,
+    pending_dx: i32,
+    pending_dy: i32,
+    last_drag_time: std::time::Instant,
     last_activity_emit: std::time::Instant,
 }
 
@@ -139,6 +145,10 @@ impl HookWorker {
             accumulator_y: 0.0,
             pending_y: 0.0,
             last_scroll_time: std::time::Instant::now(),
+            drag_active: false,
+            pending_dx: 0,
+            pending_dy: 0,
+            last_drag_time: std::time::Instant::now(),
             last_activity_emit: std::time::Instant::now(),
         }
     }
@@ -164,6 +174,19 @@ impl HookWorker {
                         self.accumulator_y = 0.0;
                         self.pending_y = 0.0;
                         self.last_scroll_time = std::time::Instant::now();
+                    }
+                    RemapCommand::UpdateDrag(start) => {
+                        if start {
+                            self.drag_active = platform::begin_window_drag();
+                            self.last_drag_time = std::time::Instant::now();
+                        } else {
+                            if self.drag_active {
+                                platform::end_window_drag();
+                            }
+                            self.drag_active = false;
+                        }
+                        self.pending_dx = 0;
+                        self.pending_dy = 0;
                     }
                 }
             }
@@ -217,6 +240,18 @@ impl HookWorker {
                         self.accumulator_y -= output as f32;
                     }
                     self.last_scroll_time = now;
+                }
+            } else if self.drag_active {
+                self.pending_dx += self.monitor.consume_x_delta();
+                self.pending_dy += self.monitor.consume_y_delta();
+                let now = std::time::Instant::now();
+                if now.duration_since(self.last_drag_time) >= std::time::Duration::from_millis(8) {
+                    if (self.pending_dx, self.pending_dy) != (0, 0) {
+                        platform::move_dragged_window(self.pending_dx, self.pending_dy);
+                        self.pending_dx = 0;
+                        self.pending_dy = 0;
+                    }
+                    self.last_drag_time = now;
                 }
             } else {
                 self.monitor.consume_x_delta();
@@ -311,6 +346,11 @@ impl KeyboardHook {
                                             let _ = tx_inner
                                                 .send(RemapCommand::UpdateScroll(Some(cfg)));
                                         }
+                                        Action::WindowDrag => {
+                                            monitor_inner.consume_x_delta();
+                                            monitor_inner.consume_y_delta();
+                                            let _ = tx_inner.send(RemapCommand::UpdateDrag(true));
+                                        }
                                         _ => {
                                             let _ =
                                                 tx_inner.send(RemapCommand::Execute(action, true));
@@ -346,6 +386,9 @@ impl KeyboardHook {
                                 match action {
                                     Action::MouseScroll(_) => {
                                         let _ = tx_inner.send(RemapCommand::UpdateScroll(None));
+                                    }
+                                    Action::WindowDrag => {
+                                        let _ = tx_inner.send(RemapCommand::UpdateDrag(false));
                                     }
                                     _ => {
                                         let _ = tx_inner.send(RemapCommand::Execute(action, false));
@@ -541,6 +584,12 @@ impl KeyboardHook {
                                                                     ),
                                                                 );
                                                             }
+                                                            Action::WindowDrag => {
+                                                                monitor_inner.consume_x_delta();
+                                                                monitor_inner.consume_y_delta();
+                                                                let _ = tx_inner
+                                                                    .send(RemapCommand::UpdateDrag(true));
+                                                            }
                                                             _ => {
                                                                 let _ = tx_inner.send(
                                                                     RemapCommand::Execute(
@@ -572,6 +621,10 @@ impl KeyboardHook {
                                                             let _ = tx_inner.send(
                                                                 RemapCommand::UpdateScroll(None),
                                                             );
+                                                        }
+                                                        Action::WindowDrag => {
+                                                            let _ = tx_inner
+                                                                .send(RemapCommand::UpdateDrag(false));
                                                         }
                                                         _ => {
                                                             let _ = tx_inner.send(

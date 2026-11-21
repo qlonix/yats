@@ -36,6 +36,7 @@ pub enum Action {
     MouseScroll(ScrollConfig),
     KeyMacro(Vec<Vec<Key>>),
     Window(WindowAction),
+    WindowDrag,
     BrowserBack,
     BrowserForward,
 }

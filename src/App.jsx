@@ -671,11 +671,16 @@ function App() {
       if (typeof actionValue !== "string") finalValue = "Left";
     } else if (actionType === "Window") {
       if (typeof actionValue !== "string") finalValue = "Close";
+    } else if (actionType === "WindowDrag") {
+      finalValue = undefined;
     } else if (actionType === "MouseScroll") {
       if (typeof actionValue !== "object" || !actionValue) finalValue = { sensitivity: 100 };
     }
 
-    const newMappings = { ...mappings, [key]: { type: actionType, value: finalValue } };
+    const newAction = finalValue === undefined
+      ? { type: actionType }
+      : { type: actionType, value: finalValue };
+    const newMappings = { ...mappings, [key]: newAction };
     setMappings(newMappings);
     saveConfigWithLatest({ mappings: newMappings });
   };
@@ -978,6 +983,7 @@ function App() {
                         <option value="MouseScroll">Scroll</option>
                         <option value="KeyMacro">Key Macro</option>
                         <option value="Window">Window Control</option>
+                        <option value="WindowDrag">Window Drag</option>
                       </select>
                     </td>
                     <td className="config-cell">

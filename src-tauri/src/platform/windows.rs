@@ -3,6 +3,9 @@
 use crate::config::{MouseButton, WindowAction};
 use std::process::Command;
 use std::os::windows::process::CommandExt;
+use std::ptr::null_mut;
+use std::sync::Mutex;
+use winapi::shared::windef::{HWND, POINT, RECT};
 use winapi::um::winuser::*;
 use winreg::enums::*;
 use winreg::RegKey;
@@ -266,4 +269,89 @@ pub fn send_mouse_scroll(delta: i32) {
 
 pub fn execute_window_action(action: WindowAction) {
     <WindowsPlatform as super::WindowManagement>::execute_window_action(action);
+}
+
+struct DragState {
+    hwnd: usize,
+    x: i32,
+    y: i32,
+}
+
+static DRAG_STATE: Mutex<Option<DragState>> = Mutex::new(None);
+
+pub fn begin_window_drag() -> bool {
+    unsafe {
+        let mut point: POINT = std::mem::zeroed();
+        if GetCursorPos(&mut point) == 0 {
+            return false;
+        }
+        let hwnd = WindowFromPoint(point);
+        if hwnd.is_null() {
+            return false;
+        }
+        let hwnd = GetAncestor(hwnd, GA_ROOT);
+        if hwnd.is_null() || IsWindowVisible(hwnd) == 0 {
+            return false;
+        }
+
+        let mut pid = 0;
+        GetWindowThreadProcessId(hwnd, &mut pid);
+        if pid == std::process::id() {
+            return false;
+        }
+
+        let mut class_name = [0u16; 256];
+        let len = GetClassNameW(hwnd, class_name.as_mut_ptr(), class_name.len() as i32);
+        if len > 0 {
+            let name = String::from_utf16_lossy(&class_name[..len as usize]);
+            if matches!(
+                name.as_str(),
+                "Progman" | "WorkerW" | "Shell_TrayWnd" | "Shell_SecondaryTrayWnd"
+            ) {
+                return false;
+            }
+        }
+
+        let mut rect: RECT = std::mem::zeroed();
+        if GetWindowRect(hwnd, &mut rect) == 0 {
+            return false;
+        }
+        if IsZoomed(hwnd) != 0 {
+            ShowWindow(hwnd, SW_RESTORE);
+            if GetWindowRect(hwnd, &mut rect) == 0 {
+                return false;
+            }
+        }
+
+        *crate::lock_unpoison(&DRAG_STATE) = Some(DragState {
+            hwnd: hwnd as usize,
+            x: rect.left,
+            y: rect.top,
+        });
+        crate::audit_log("[DRAG] begin");
+        true
+    }
+}
+
+pub fn move_dragged_window(dx: i32, dy: i32) {
+    if let Some(state) = crate::lock_unpoison(&DRAG_STATE).as_mut() {
+        state.x += dx;
+        state.y += dy;
+        unsafe {
+            SetWindowPos(
+                state.hwnd as HWND,
+                null_mut(),
+                state.x,
+                state.y,
+                0,
+                0,
+                SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
+            );
+        }
+    }
+}
+
+pub fn end_window_drag() {
+    *crate::lock_unpoison(&DRAG_STATE) = None;
+    crate::audit_log("[DRAG] end");
 }

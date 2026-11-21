@@ -38,3 +38,5 @@ winreg = "0.52"
 evdev = "0.12"
 nix = { version = "0.27", features = ["user"] }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+x11rb = "0.13"
