@@ -99,6 +99,16 @@ fn execute_action(action: Action, pressed: bool, app: &Mutex<Option<AppHandle>>)
     }
 }
 
+/// スクロール蓄積量からプラットフォームの送信単位への換算係数。
+/// Windows のホイール量は WHEEL_DELTA (120) で 1 ノッチで、ノッチ未満の量も
+/// 送れる。そのため Windows では 120 倍の解像度で蓄積し、細かい動きでも
+/// 少しずつスクロールできるようにする。Linux (enigo) は 1 単位 = 1 クリック
+/// の整数単位でしか送れないため 1 倍のまま（端数は蓄積側に残る）。
+#[cfg(target_os = "windows")]
+const SCROLL_SEND_SCALE: f32 = 120.0;
+#[cfg(not(target_os = "windows"))]
+const SCROLL_SEND_SCALE: f32 = 1.0;
+
 pub struct HookWorker {
     rx: Receiver<RemapCommand>,
     active_scroll: Option<ScrollConfig>,
@@ -181,7 +191,7 @@ impl HookWorker {
                             cfg.linux_use_scroll_curve,
                             &cfg.linux_scroll_curve,
                             key_cfg,
-                        );
+                        ) * SCROLL_SEND_SCALE;
                         if cfg.linux_use_scroll_curve
                             && CURVE_MONITORING.load(Ordering::SeqCst)
                             && now.duration_since(self.last_activity_emit)

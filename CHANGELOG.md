@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - パームリジェクションの接触判定を改良。接触開始時刻をタッチパッドの接触状態 (evdev の TRACKING_ID / BTN_TOUCH) から取るようにし、タイピング前から置かれている手のひらがわずかに動いても、新規の接触と誤認せず抑止が続くようにした
 - Windows でスクロールが Linux より極端に遅くなる問題を修正。ホイール量の単位が揃っておらず（Windows は 120 で 1 ノッチ、Linux は 1 単位 = 1 クリック）、Windows では 1/120 しか送られていなかった。Windows 側の送信量を 120 倍にし、同じ設定で同じスクロール量になるよう統一した
 - Scroll Tuning の Min Scroll Output Speed のスライダーが他の項目より短く表示される問題を修正し、3 つのスライダーのレイアウトを揃えた
+- Windows で細かい動きのスクロール量が最小でも大きすぎる問題を修正。ホイール量を 1 ノッチ (120) 単位でしか送っていなかったため、Windows ではノッチ未満の量も送れるよう送信解像度を 120 倍にし、わずかな動きでも少しずつスクロールできるようにした
 
 ### Changed
 - トレイアイコンのツールチップ（ホバー表示）を「YATS」から「YATS Ver. X.X.X」（現在のバージョン番号）へ変更
@@ -33,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved the palm rejection contact tracking. The contact start time is now taken from the touchpad's actual contact state (evdev TRACKING_ID / BTN_TOUCH), so a palm that rests on the pad from before typing is not mistaken for a fresh touch when it shifts slightly, and stays rejected
 - Fixed scrolling on Windows being far slower than on Linux. The wheel amount units were inconsistent (Windows: 120 per notch, Linux: 1 unit = 1 click), so Windows only sent 1/120 of the intended amount. The Windows send amount is now multiplied by 120 so the same settings produce the same scroll amount on both platforms
 - Fixed the Min Scroll Output Speed slider in Scroll Tuning being shorter than the other sliders, and aligned the layout of all three sliders
+- Fixed the minimum scroll amount on Windows being too large for fine movements. Wheel amounts were only sent in whole-notch (120) steps; the send resolution on Windows is now 120 times finer so sub-notch amounts are sent and small movements scroll gradually
 
 ### Changed
 - Changed the tray icon tooltip (hover text) from "YATS" to "YATS Ver. X.X.X" (the current version number)
