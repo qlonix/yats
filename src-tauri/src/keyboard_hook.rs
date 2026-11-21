@@ -285,22 +285,13 @@ impl KeyboardHook {
                             }
 
                             let now = std::time::Instant::now();
-                            let is_palm_rejected = {
-                                let cfg = read_unpoison(&config_inner);
-                                if cfg.palm_rejection {
-                                    if let Some(last_time) = *lock_unpoison(&last_typing_inner) {
-                                        now.duration_since(last_time).as_millis()
-                                            < cfg.palm_rejection_delay_ms as u128
-                                            || monitor_inner
-                                                .contact_started_at()
-                                                .is_some_and(|started_at| started_at < last_time)
-                                    } else {
-                                        false
-                                    }
-                                } else {
-                                    false
-                                }
-                            };
+                            let palm_reason = palm_rejection_reason(
+                                &read_unpoison(&config_inner),
+                                *lock_unpoison(&last_typing_inner),
+                                monitor_inner.contact_started_at(),
+                                now,
+                            );
+                            let is_palm_rejected = palm_reason.is_some();
 
                             let touched = monitor_inner.is_touched();
                             let action = {
@@ -328,8 +319,12 @@ impl KeyboardHook {
                                     return None;
                                 }
                             } else {
-                                if action.is_some() && touched && is_palm_rejected {
-                                    crate::audit_log(&format!("[PALM] key={key:?} rejected"));
+                                if action.is_some() && touched {
+                                    if let Some(reason) = palm_reason {
+                                        crate::audit_log(&format!(
+                                            "[PALM] key={key:?} rejected ({reason})"
+                                        ));
+                                    }
                                 }
                                 *lock_unpoison(&last_typing_inner) = Some(now);
                             }
@@ -503,28 +498,13 @@ impl KeyboardHook {
                                             1 => {
                                                 // Press
                                                 let now = std::time::Instant::now();
-                                                let is_palm_rejected = {
-                                                    let cfg = read_unpoison(&config_inner);
-                                                    if cfg.palm_rejection {
-                                                        if let Some(last_time) =
-                                                            *lock_unpoison(&last_typing_inner)
-                                                        {
-                                                            now.duration_since(last_time)
-                                                                .as_millis()
-                                                                < cfg.palm_rejection_delay_ms
-                                                                    as u128
-                                                                || monitor_inner
-                                                                    .contact_started_at()
-                                                                    .is_some_and(|started_at| {
-                                                                        started_at < last_time
-                                                                    })
-                                                        } else {
-                                                            false
-                                                        }
-                                                    } else {
-                                                        false
-                                                    }
-                                                };
+                                                let palm_reason = palm_rejection_reason(
+                                                    &read_unpoison(&config_inner),
+                                                    *lock_unpoison(&last_typing_inner),
+                                                    monitor_inner.contact_started_at(),
+                                                    now,
+                                                );
+                                                let is_palm_rejected = palm_reason.is_some();
 
                                                 let is_remap = {
                                                     let cfg = read_unpoison(&config_inner);
@@ -573,15 +553,13 @@ impl KeyboardHook {
                                                         continue;
                                                     }
                                                 } else {
-                                                    if is_remap
-                                                        && touched
-                                                        && !paused
-                                                        && !simulating
-                                                        && is_palm_rejected
+                                                    if is_remap && touched && !paused && !simulating
                                                     {
-                                                        crate::audit_log(&format!(
-                                                            "[PALM] key={rkey:?} rejected"
-                                                        ));
+                                                        if let Some(reason) = palm_reason {
+                                                            crate::audit_log(&format!(
+                                                                "[PALM] key={rkey:?} rejected ({reason})"
+                                                            ));
+                                                        }
                                                     }
                                                     *lock_unpoison(&last_typing_inner) = Some(now);
                                                 }
@@ -639,6 +617,29 @@ impl KeyboardHook {
                 std::thread::sleep(std::time::Duration::from_secs(2));
             }
         }
+    }
+}
+
+/// パームリジェクションで抑止する場合はその理由を返す（抑止しない場合は None）。
+/// 理由は監査ログで「直前のタイピングによる抑止 (recent typing)」と
+/// 「接触の方がタイピングより先だったための抑止 (stale contact)」を
+/// 区別するために使う。
+fn palm_rejection_reason(
+    cfg: &AppConfig,
+    last_typing: Option<std::time::Instant>,
+    contact_started_at: Option<std::time::Instant>,
+    now: std::time::Instant,
+) -> Option<&'static str> {
+    if !cfg.palm_rejection {
+        return None;
+    }
+    let last_time = last_typing?;
+    if now.duration_since(last_time).as_millis() < cfg.palm_rejection_delay_ms as u128 {
+        Some("recent typing")
+    } else if contact_started_at.is_some_and(|started_at| started_at < last_time) {
+        Some("stale contact")
+    } else {
+        None
     }
 }
 

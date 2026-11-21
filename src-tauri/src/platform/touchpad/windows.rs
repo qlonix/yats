@@ -82,18 +82,35 @@ pub unsafe extern "system" fn wnd_proc(
                     }
                 } else if raw.header.dwType == RIM_TYPEHID {
                     let hid = raw.data.hid();
-                    if check_hid_touch(raw.header.hDevice, hid) {
-                        event_detected = true;
+                    // 接触の開始・終了は HID レポートの遷移でのみ管理する。
+                    // マウス移動などの活動で contact_start_time を作ると、開始
+                    // 時刻が古いまま固定され、タイピング後のキー押下がすべて
+                    // 「接触の方が先」として抑止され続けてしまう。
+                    match check_hid_touch(raw.header.hDevice, hid) {
+                        HidContact::Down => {
+                            event_detected = true;
+                            let mut contacts = crate::lock_unpoison(&state.hid_contacts);
+                            let any_active = contacts.values().any(|&a| a);
+                            contacts.insert(device_id, true);
+                            if !any_active {
+                                *crate::lock_unpoison(&state.contact_start_time) =
+                                    Some(std::time::Instant::now());
+                            }
+                        }
+                        HidContact::Up => {
+                            let mut contacts = crate::lock_unpoison(&state.hid_contacts);
+                            contacts.insert(device_id, false);
+                            if !contacts.values().any(|&a| a) {
+                                *crate::lock_unpoison(&state.contact_start_time) = None;
+                            }
+                        }
+                        HidContact::Unknown => {}
                     }
                 }
 
                 if event_detected {
                     if let Ok(mut last_time) = state.last_touch_time.lock() {
-                        let now = std::time::Instant::now();
-                        *last_time = now;
-                        if let Ok(mut start_time) = state.contact_start_time.lock() {
-                            start_time.get_or_insert(now);
-                        }
+                        *last_time = std::time::Instant::now();
                         state.is_touched.store(true, Ordering::SeqCst);
                     }
                     if let Ok(h) = state.app_handle.try_lock() {
@@ -199,13 +216,26 @@ pub fn scan_and_register(_state: &MonitorState, hwnd: HWND) {
     }
 }
 
-unsafe fn check_hid_touch(device_handle: winapi::shared::ntdef::HANDLE, raw_hid: &RAWHID) -> bool {
+/// HID レポートから読み取ったタッチパッドの接触状態。
+/// Up を返すのはデジタイザと確認できたデバイスだけ（他の HID デバイスの
+/// レポートで接触状態を消してしまわないため）。
+#[derive(PartialEq)]
+enum HidContact {
+    /// 判定できなかった（デジタイザでない、または解析に失敗した）
+    Unknown,
+    /// 接触中（Confidence ありの Tip Switch が ON）
+    Down,
+    /// 接触なし（Tip Switch がすべて OFF）
+    Up,
+}
+
+unsafe fn check_hid_touch(device_handle: winapi::shared::ntdef::HANDLE, raw_hid: &RAWHID) -> HidContact {
     let mut preparsed_data_size: UINT = 0;
     if GetRawInputDeviceInfoW(device_handle, RIDI_PREPARSEDDATA, std::ptr::null_mut(), &mut preparsed_data_size) != 0 {
-        return false;
+        return HidContact::Unknown;
     }
     if preparsed_data_size == 0 {
-        return false;
+        return HidContact::Unknown;
     }
 
     let mut preparsed_data = vec![0u8; preparsed_data_size as usize];
@@ -216,18 +246,18 @@ unsafe fn check_hid_touch(device_handle: winapi::shared::ntdef::HANDLE, raw_hid:
         &mut preparsed_data_size,
     ) == !0
     {
-        return false;
+        return HidContact::Unknown;
     }
 
     let p_preparsed = preparsed_data.as_mut_ptr() as PHIDP_PREPARSED_DATA;
     let mut caps: HIDP_CAPS = std::mem::zeroed();
     if HidP_GetCaps(p_preparsed, &mut caps) != HIDP_STATUS_SUCCESS {
-        return false;
+        return HidContact::Unknown;
     }
 
     let button_caps_length = caps.NumberInputButtonCaps;
     if button_caps_length == 0 {
-        return false;
+        return HidContact::Unknown;
     }
     let mut button_caps = vec![std::mem::zeroed::<HIDP_BUTTON_CAPS>(); button_caps_length as usize];
     // HidP_GetButtonCaps の第3引数は PUSHORT（*mut u16）のため、USHORT のまま渡す
@@ -239,7 +269,17 @@ unsafe fn check_hid_touch(device_handle: winapi::shared::ntdef::HANDLE, raw_hid:
         p_preparsed,
     ) != HIDP_STATUS_SUCCESS
     {
-        return false;
+        return HidContact::Unknown;
+    }
+
+    // デジタイザ（UsagePage 0x0D）のボタンを持たないデバイスはタッチ
+    // デバイスではないので、その レポートで接触状態を判定しない。
+    let is_digitizer = button_caps
+        .iter()
+        .take(actual_button_caps_length as usize)
+        .any(|cap| cap.UsagePage == 0x0D);
+    if !is_digitizer {
+        return HidContact::Unknown;
     }
 
     let report_ptr = &raw_hid.bRawData as *const u8;
@@ -320,6 +360,10 @@ unsafe fn check_hid_touch(device_handle: winapi::shared::ntdef::HANDLE, raw_hid:
             break;
         }
     }
-    
-    touch_detected
+
+    if touch_detected {
+        HidContact::Down
+    } else {
+        HidContact::Up
+    }
 }

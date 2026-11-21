@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**日本語**
+
+### Fixed
+- Windows で、しばらく使うとクリックやスクロールが一切効かなくなる問題を修正。接触開始時刻がマウス移動などの活動でも記録されていたため、最初のタイピング以降は「接触の方が先」と判定され続け、すべてのアクションがパームリジェクションで抑止されていた。接触の開始・終了を HID レポートの接触遷移（指が触れた／離れた）だけで管理するよう変更した
+- パームリジェクションの監査ログに抑止理由（recent typing / stale contact）を記録するようにした
+
+**English**
+
+### Fixed
+- Fixed clicks and scroll stopping entirely on Windows after a while. The contact start time was recorded on any activity including mouse movement, so after the first typing every action was judged "contact started before typing" and suppressed by palm rejection. Contact start/end is now tracked only from HID contact transitions (finger down / finger up)
+- Palm rejection audit log entries now record the rejection reason (recent typing / stale contact)
+
 ## [1.3.10] - 2026-11-21
 
 **日本語**

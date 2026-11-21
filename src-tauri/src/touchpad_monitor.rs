@@ -19,6 +19,10 @@ pub struct MonitorState {
     pub app_handle: Arc<Mutex<Option<AppHandle>>>,
     #[cfg(target_os = "windows")]
     pub hwnd: Mutex<Option<SendHwnd>>,
+    /// Windows: デバイスごとの HID 接触状態（device_id → 接触中かどうか）。
+    /// contact_start_time の開始・終了はこの遷移だけで管理する。
+    #[cfg(target_os = "windows")]
+    pub hid_contacts: Mutex<HashMap<usize, bool>>,
     pub device_activity: Mutex<HashMap<usize, u32>>,
     pub locked_device: Mutex<Option<usize>>,
 }
@@ -43,6 +47,8 @@ impl TouchpadMonitor {
             app_handle,
             #[cfg(target_os = "windows")]
             hwnd: Mutex::new(None),
+            #[cfg(target_os = "windows")]
+            hid_contacts: Mutex::new(HashMap::new()),
             device_activity: Mutex::new(HashMap::new()),
             locked_device: Mutex::new(None),
         });
