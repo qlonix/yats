@@ -804,7 +804,7 @@ function App() {
                 </label>
               </div>
               <div className="tuning-grid">
-                <div className="setting-item">
+                <div className="setting-item full-width">
                   <label className="setting-label">Min Scroll Output Speed</label>
                   <p className="setting-hint">Lower bound of the curve's output axis.</p>
                   <div className="setting-row">

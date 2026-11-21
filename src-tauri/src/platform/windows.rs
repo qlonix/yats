@@ -53,7 +53,10 @@ impl super::InputSimulation for WindowsPlatform {
             let mut mi: MOUSEINPUT = std::mem::zeroed();
 
             mi.dwFlags = MOUSEEVENTF_WHEEL;
-            mi.mouseData = delta as u32;
+            // Windows のホイール量は WHEEL_DELTA (120) で 1 ノッチ。
+            // Linux (enigo) は 1 単位 = 1 クリックとして扱うため、単位を揃える。
+            // これをしないと Windows では Linux の 1/120 しかスクロールしない。
+            mi.mouseData = delta.saturating_mul(120) as u32;
 
             *input.u.mi_mut() = mi;
             SendInput(1, &mut input, std::mem::size_of::<INPUT>() as i32);
