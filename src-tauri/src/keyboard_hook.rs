@@ -532,11 +532,22 @@ impl KeyboardHook {
                                             1 => {
                                                 // Press
                                                 let now = std::time::Instant::now();
+                                                let gap_movement =
+                                                    (*lock_unpoison(&last_typing_inner)).map(|lt| {
+                                                        let to = now
+                                                            .checked_sub(
+                                                                std::time::Duration::from_millis(
+                                                                    150,
+                                                                ),
+                                                            )
+                                                            .unwrap_or(lt);
+                                                        monitor_inner.movement_between(lt, to)
+                                                    });
                                                 let palm_reason = palm_rejection_reason(
                                                     &read_unpoison(&config_inner),
                                                     *lock_unpoison(&last_typing_inner),
                                                     monitor_inner.contact_started_at(),
-                                                    Some(monitor_inner.recent_movement(500)),
+                                                    gap_movement,
                                                     now,
                                                 );
                                                 let is_palm_rejected = palm_reason.is_some();
@@ -673,7 +684,7 @@ fn palm_rejection_reason(
     cfg: &AppConfig,
     last_typing: Option<std::time::Instant>,
     contact_started_at: Option<std::time::Instant>,
-    recent_movement: Option<i32>,
+    gap_movement: Option<i32>,
     now: std::time::Instant,
 ) -> Option<&'static str> {
     if !cfg.palm_rejection {
@@ -683,16 +694,16 @@ fn palm_rejection_reason(
     if now.duration_since(last_time).as_millis() < cfg.palm_rejection_delay_ms as u128 {
         return Some("recent typing");
     }
-    // タイピングの合間に置かれた手は、キー押下の直前には動いていない。
-    // 最後のキー入力から間もなく始まった接触で、直近 500ms の移動が
-    // ほとんど無い場合のキー押下は誤爆とみなす（意図した操作は押下の
-    // 直前にカーソル移動を伴うことが多い）。累計ではなく直近の移動で
-    // 見るのは、置き手も時間とともに微振動で累計が増えてしまうため。
+    // タイピングの間の誤爆は「最後のキー入力の後に親指が触れ直し、その
+    // ままカーソル移動せずに次のキーが押された」形で起きる。意図した
+    // 操作では、最後のキー入力から押下までの間に親指でカーソルを
+    // 動かしているはずなので、その間の移動量がほぼ無い場合は誤爆と
+    // みなす。押下直前 150ms は打鍵自体の揺れとして数えない。
     // 移動量を数えるのは Linux のみ（他は None でこのルールは無効）。
-    if let (Some(movement), Some(started_at)) = (recent_movement, contact_started_at) {
+    if let (Some(movement), Some(started_at)) = (gap_movement, contact_started_at) {
         if started_at > last_time
-            && started_at.duration_since(last_time).as_millis() < 5000
-            && movement < 40
+            && started_at.duration_since(last_time).as_millis() < 3000
+            && movement < 60
         {
             return Some("typing contact");
         }

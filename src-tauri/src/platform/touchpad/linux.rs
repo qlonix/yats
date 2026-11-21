@@ -155,7 +155,7 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
         if let Ok(mut events) = state.movement_events.lock() {
             events.push_back((now, amount));
             while let Some(&(time, _)) = events.front() {
-                if now.duration_since(time).as_millis() > 600 {
+                if now.duration_since(time).as_millis() > 3500 {
                     events.pop_front();
                 } else {
                     break;
@@ -178,9 +178,6 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
     let mut slot_peak_major = [0i32; 16];
     let mut slot_peak_minor = [0i32; 16];
     let mut slot_peak_width = [0i32; 16];
-    // 形状判定用に、各スロットの最新の長径・短径を保持する
-    let mut slot_cur_major = [0i32; 16];
-    let mut slot_cur_minor = [0i32; 16];
 
     const ABS_MT_SLOT: u16 = 0x2f;
     const ABS_MT_TOOL_TYPE: u16 = AbsoluteAxisType::ABS_MT_TOOL_TYPE.0;
@@ -257,8 +254,6 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                             slot_peak_major[current_slot] = 0;
                             slot_peak_minor[current_slot] = 0;
                             slot_peak_width[current_slot] = 0;
-                            slot_cur_major[current_slot] = 0;
-                            slot_cur_minor[current_slot] = 0;
                             slot_active[current_slot] = false;
                             slot_is_palm[current_slot] = false;
                             slot_major_palm[current_slot] = false;
@@ -276,7 +271,6 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                             slot_is_palm[current_slot] = is_palm;
                         }
                     } else if code == ABS_MT_TOUCH_MAJOR {
-                        slot_cur_major[current_slot] = ev.value();
                         if ev.value() > slot_peak_major[current_slot] {
                             slot_peak_major[current_slot] = ev.value();
                         }
@@ -303,37 +297,9 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                             slot_major_palm[current_slot] = true;
                             palm_flipped = true;
                         }
-                        // 形状判定: 長径・短径ともに大きい丸い接触は、指先
-                        // （短径が小さい楕円）ではなく手のひら側の接触。
-                        // タイピング中の誤爆接触は実測で 300x300 前後に集中する。
-                        if major_resolution == 0
-                            && !slot_major_palm[current_slot]
-                            && slot_cur_major[current_slot] >= 280
-                            && slot_cur_minor[current_slot] >= 250
-                        {
-                            crate::audit_log(&format!(
-                                "[PALM] slot {current_slot} rejected by shape (raw {}x{})",
-                                slot_cur_major[current_slot], slot_cur_minor[current_slot]
-                            ));
-                            slot_major_palm[current_slot] = true;
-                            palm_flipped = true;
-                        }
                     } else if code == ABS_MT_TOUCH_MINOR {
-                        slot_cur_minor[current_slot] = ev.value();
                         if ev.value() > slot_peak_minor[current_slot] {
                             slot_peak_minor[current_slot] = ev.value();
-                        }
-                        if major_resolution == 0
-                            && !slot_major_palm[current_slot]
-                            && slot_cur_major[current_slot] >= 280
-                            && slot_cur_minor[current_slot] >= 250
-                        {
-                            crate::audit_log(&format!(
-                                "[PALM] slot {current_slot} rejected by shape (raw {}x{})",
-                                slot_cur_major[current_slot], slot_cur_minor[current_slot]
-                            ));
-                            slot_major_palm[current_slot] = true;
-                            palm_flipped = true;
                         }
                     } else if code == ABS_MT_WIDTH_MAJOR {
                         if ev.value() > slot_peak_width[current_slot] {

@@ -173,12 +173,18 @@ impl TouchpadMonitor {
         *lock_unpoison(&self.state.contact_start_time)
     }
 
-    /// 直近 window_ms 以内の移動量合計（デバイス単位）。
-    pub fn recent_movement(&self, window_ms: u64) -> i32 {
+    /// from から to の間の移動量合計（デバイス単位）。
+    /// 「最後のキー入力からキー押下までの間にカーソル移動があったか」を
+    /// 測るために使う。履歴は直近 3.5 秒分を保持する。
+    pub fn movement_between(
+        &self,
+        from: std::time::Instant,
+        to: std::time::Instant,
+    ) -> i32 {
         let now = std::time::Instant::now();
         let mut events = lock_unpoison(&self.state.movement_events);
         while let Some(&(time, _)) = events.front() {
-            if now.duration_since(time).as_millis() > 600 {
+            if now.duration_since(time).as_millis() > 3500 {
                 events.pop_front();
             } else {
                 break;
@@ -186,7 +192,7 @@ impl TouchpadMonitor {
         }
         events
             .iter()
-            .filter(|&&(time, _)| now.duration_since(time).as_millis() <= window_ms as u128)
+            .filter(|&&(time, _)| time > from && time < to)
             .map(|&(_, amount)| amount)
             .sum()
     }

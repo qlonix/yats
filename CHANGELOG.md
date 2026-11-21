@@ -26,7 +26,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Linux で、接触面積の解像度を報告しないタッチパッド（実測で指先は最大 450 前後、手のひらは 550 以上）でもパームリジェクションの面積判定が働くようにした。生値のしきい値（500）で判定し、手のひらと確定した接触しか残っていない場合はタッチ状態を即座に解除する
 - Linux で、最後のキー入力から間もなく始まり、ほとんど動いていない接触でのキー押下もパームとして抑止するようにした（IME 変換中の間などで置き手が残るケースの誤爆対策）
-- Linux で、長径・短径ともに大きい丸い接触もパームとして判定するようにした。タイピング中の誤爆接触は 300x300 前後の丸い形状に集中しており、指先（短径の小さい楕円）と形状で切り分けられる
 - Windows で、しばらく使うとクリックやスクロールが一切効かなくなる問題を修正。接触開始時刻がマウス移動などの活動でも記録されていたため、最初のタイピング以降は「接触の方が先」と判定され続け、すべてのアクションがパームリジェクションで抑止されていた。接触の開始・終了を HID レポートの接触遷移（指が触れた／離れた）だけで管理するよう変更した
 - パームリジェクションの監査ログに抑止理由（recent typing / stale contact）を記録するようにした
 
@@ -35,8 +34,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - On Linux, palm rejection by contact size now also works on touchpads that report no size resolution (measured: fingertips peak around 450 raw, palms at 550+), using a raw-value threshold of 500. When only palm-classified contacts remain, the touched state is cleared immediately
 - On Linux, a key press during a contact that started shortly after the last keystroke and has barely moved is now also suppressed as a palm (covers misfires from palms left resting during IME conversion pauses)
-- On Linux, large round contacts (both major and minor axes large) are now also classified as palms. Misfire contacts while typing cluster around 300x300 raw, while fingertips are ellipses with a small minor axis
-- On Linux, Window Drag now moves windows through the window manager's interactive move (_NET_WM_MOVERESIZE). The previous methods were clamped to the screen by WM policy; the interactive move is treated like a title-bar drag and allows partial off-screen positions
 - Fixed clicks and scroll stopping entirely on Windows after a while. The contact start time was recorded on any activity including mouse movement, so after the first typing every action was judged "contact started before typing" and suppressed by palm rejection. Contact start/end is now tracked only from HID contact transitions (finger down / finger up)
 - Palm rejection audit log entries now record the rejection reason (recent typing / stale contact)
 
