@@ -275,6 +275,8 @@ struct DragState {
     hwnd: usize,
     x: i32,
     y: i32,
+    last_cx: i32,
+    last_cy: i32,
 }
 
 static DRAG_STATE: Mutex<Option<DragState>> = Mutex::new(None);
@@ -327,14 +329,29 @@ pub fn begin_window_drag() -> bool {
             hwnd: hwnd as usize,
             x: rect.left,
             y: rect.top,
+            last_cx: point.x,
+            last_cy: point.y,
         });
         crate::audit_log("[DRAG] begin");
         true
     }
 }
 
-pub fn move_dragged_window(dx: i32, dy: i32) {
+pub fn move_dragged_window() {
     if let Some(state) = crate::lock_unpoison(&DRAG_STATE).as_mut() {
+        // 移動量はカーソルの実移動量に合わせる（生デルタだと OS の
+        // ポインタ速度・加速とずれて、ウィンドウだけ速く動いてしまう）。
+        let mut point: POINT = unsafe { std::mem::zeroed() };
+        if unsafe { GetCursorPos(&mut point) } == 0 {
+            return;
+        }
+        let dx = point.x - state.last_cx;
+        let dy = point.y - state.last_cy;
+        if (dx, dy) == (0, 0) {
+            return;
+        }
+        state.last_cx = point.x;
+        state.last_cy = point.y;
         state.x += dx;
         state.y += dy;
         unsafe {

@@ -122,8 +122,6 @@ pub struct HookWorker {
     pending_y: f32,
     last_scroll_time: std::time::Instant,
     drag_active: bool,
-    pending_dx: i32,
-    pending_dy: i32,
     last_drag_time: std::time::Instant,
     last_activity_emit: std::time::Instant,
 }
@@ -146,8 +144,6 @@ impl HookWorker {
             pending_y: 0.0,
             last_scroll_time: std::time::Instant::now(),
             drag_active: false,
-            pending_dx: 0,
-            pending_dy: 0,
             last_drag_time: std::time::Instant::now(),
             last_activity_emit: std::time::Instant::now(),
         }
@@ -185,8 +181,6 @@ impl HookWorker {
                             }
                             self.drag_active = false;
                         }
-                        self.pending_dx = 0;
-                        self.pending_dy = 0;
                     }
                 }
             }
@@ -242,15 +236,11 @@ impl HookWorker {
                     self.last_scroll_time = now;
                 }
             } else if self.drag_active {
-                self.pending_dx += self.monitor.consume_x_delta();
-                self.pending_dy += self.monitor.consume_y_delta();
+                // 移動量はタッチパッドの生デルタではなくカーソルの実移動量に
+                // 合わせる（platform 側でカーソル位置の差分を取る）。
                 let now = std::time::Instant::now();
                 if now.duration_since(self.last_drag_time) >= std::time::Duration::from_millis(8) {
-                    if (self.pending_dx, self.pending_dy) != (0, 0) {
-                        platform::move_dragged_window(self.pending_dx, self.pending_dy);
-                        self.pending_dx = 0;
-                        self.pending_dy = 0;
-                    }
+                    platform::move_dragged_window();
                     self.last_drag_time = now;
                 }
             } else {

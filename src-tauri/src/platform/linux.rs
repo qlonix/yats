@@ -5,7 +5,9 @@ use enigo::{Axis, Button, Direction, Enigo, Key, Keyboard, Mouse, Settings};
 
 use std::sync::Mutex;
 use x11rb::connection::Connection;
-use x11rb::protocol::xproto::{AtomEnum, ClientMessageEvent, ConnectionExt, EventMask};
+use x11rb::protocol::xproto::{
+    AtomEnum, ClientMessageEvent, ConfigureWindowAux, ConnectionExt, EventMask,
+};
 use x11rb::rust_connection::RustConnection;
 
 pub struct LinuxPlatform;
@@ -164,9 +166,8 @@ struct DragState {
     root: u32,
     x: i32,
     y: i32,
-    w: u32,
-    h: u32,
-    moveresize_atom: u32,
+    last_cx: i32,
+    last_cy: i32,
 }
 
 static DRAG_STATE: Mutex<Option<DragState>> = Mutex::new(None);
@@ -263,16 +264,6 @@ pub fn begin_window_drag() -> bool {
     let Some(mut pos) = translate(&conn) else {
         return false;
     };
-    let Some(geometry) = conn
-        .get_geometry(window)
-        .ok()
-        .and_then(|cookie| cookie.reply().ok())
-    else {
-        return false;
-    };
-    let Some(moveresize_atom) = intern(b"_NET_MOVERESIZE_WINDOW") else {
-        return false;
-    };
     if let (Some(state), Some(horz), Some(vert)) = (
         intern(b"_NET_WM_STATE"),
         intern(b"_NET_WM_STATE_MAXIMIZED_HORZ"),
@@ -306,37 +297,57 @@ pub fn begin_window_drag() -> bool {
         }
     }
 
+    let Some(pointer) = conn
+        .query_pointer(root)
+        .ok()
+        .and_then(|cookie| cookie.reply().ok())
+    else {
+        return false;
+    };
+
     *crate::lock_unpoison(&DRAG_STATE) = Some(DragState {
         conn,
         window,
         root,
         x: pos.0,
         y: pos.1,
-        w: u32::from(geometry.width),
-        h: u32::from(geometry.height),
-        moveresize_atom,
+        last_cx: i32::from(pointer.root_x),
+        last_cy: i32::from(pointer.root_y),
     });
     crate::audit_log("[DRAG] begin");
     true
 }
 
-pub fn move_dragged_window(dx: i32, dy: i32) {
+pub fn move_dragged_window() {
     if let Some(state) = crate::lock_unpoison(&DRAG_STATE).as_mut() {
+        // 移動量はカーソルの実移動量に合わせる（タッチパッドの生デルタは
+        // デバイス座標系なので、カーソルより速く動いてしまう）。
+        let Some(pointer) = state
+            .conn
+            .query_pointer(state.root)
+            .ok()
+            .and_then(|cookie| cookie.reply().ok())
+        else {
+            return;
+        };
+        let cx = i32::from(pointer.root_x);
+        let cy = i32::from(pointer.root_y);
+        let dx = cx - state.last_cx;
+        let dy = cy - state.last_cy;
+        if (dx, dy) == (0, 0) {
+            return;
+        }
+        state.last_cx = cx;
+        state.last_cy = cy;
         state.x += dx;
         state.y += dy;
-        let flags = 1 | (1 << 8) | (1 << 9) | (1 << 10) | (1 << 11) | (1 << 12);
-        let event = ClientMessageEvent::new(
-            32,
-            state.window,
-            state.moveresize_atom,
-            [flags, state.x as u32, state.y as u32, state.w, state.h],
-        );
-        let _ = state.conn.send_event(
-            false,
-            state.root,
-            EventMask::SUBSTRUCTURE_REDIRECT | EventMask::SUBSTRUCTURE_NOTIFY,
-            event,
-        );
+        // 移動は ConfigureRequest で行う。_NET_MOVERESIZE_WINDOW だと
+        // WM の対話移動ポリシーで画面内に制限され、サイズも送ってしまう。
+        // ConfigureRequest はアプリ自身の移動と同じ経路で、WM も通常は
+        // 画面外へのはみ出しを許容する。サイズは送らないので、最大化
+        // 解除後の復元サイズがそのまま維持される。
+        let aux = ConfigureWindowAux::new().x(state.x).y(state.y);
+        let _ = state.conn.configure_window(state.window, &aux);
         let _ = state.conn.flush();
     }
 }
