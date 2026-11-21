@@ -24,12 +24,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **日本語**
 
 ### Fixed
+- Linux で、接触面積の解像度を報告しないタッチパッド（実測で指先は最大 450 前後、手のひらは 550 以上）でもパームリジェクションの面積判定が働くようにした。生値のしきい値（500）で判定し、手のひらと確定した接触しか残っていない場合はタッチ状態を即座に解除する
 - Windows で、しばらく使うとクリックやスクロールが一切効かなくなる問題を修正。接触開始時刻がマウス移動などの活動でも記録されていたため、最初のタイピング以降は「接触の方が先」と判定され続け、すべてのアクションがパームリジェクションで抑止されていた。接触の開始・終了を HID レポートの接触遷移（指が触れた／離れた）だけで管理するよう変更した
 - パームリジェクションの監査ログに抑止理由（recent typing / stale contact）を記録するようにした
 
 **English**
 
 ### Fixed
+- On Linux, palm rejection by contact size now also works on touchpads that report no size resolution (measured: fingertips peak around 450 raw, palms at 550+), using a raw-value threshold of 500. When only palm-classified contacts remain, the touched state is cleared immediately
 - Fixed clicks and scroll stopping entirely on Windows after a while. The contact start time was recorded on any activity including mouse movement, so after the first typing every action was judged "contact started before typing" and suppressed by palm rejection. Contact start/end is now tracked only from HID contact transitions (finger down / finger up)
 - Palm rejection audit log entries now record the rejection reason (recent typing / stale contact)
 

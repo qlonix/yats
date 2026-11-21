@@ -154,6 +154,9 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
     let mut st_contact = false;
     let mut slot_is_palm = [false; 16];
     let mut slot_major_palm = [false; 16];
+    // 解像度を報告しないデバイス向けのパーム判定しきい値（TOUCH_MAJOR の生値）。
+    // 実測では指先の接触は最大でも 450 前後、手のひらは 550 以上だった。
+    const RAW_PALM_MAJOR_THRESHOLD: i32 = 500;
     // パーム判定の調整用に、接触ごとの各軸の最大値を記録する（診断ビルド用）
     let mut slot_peak_major = [0i32; 16];
     let mut slot_peak_minor = [0i32; 16];
@@ -206,6 +209,8 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                         && ev.code() == BTN_TOUCH
                         && matches!(value, 0 | 1));
 
+                let mut palm_flipped = false;
+
                 // Process slot/palm tracking first
                 if ev_type == EventType::ABSOLUTE {
                     let code = ev.code();
@@ -244,6 +249,7 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                                 crate::audit_log(&format!(
                                     "[PALM] slot {current_slot} rejected by tool_type"
                                 ));
+                                palm_flipped = true;
                             }
                             slot_is_palm[current_slot] = is_palm;
                         }
@@ -251,16 +257,28 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                         if ev.value() > slot_peak_major[current_slot] {
                             slot_peak_major[current_slot] = ev.value();
                         }
+                        // 一度しきい値を超えたら、その接触が終わるまでパーム扱いを維持する
+                        // （接触面積は指の重みで上下するため、値に追従させると判定が漏れる）。
                         if major_resolution > 0 {
                             let size_mm = f64::from(ev.value()) / f64::from(major_resolution);
-                            // 一度しきい値を超えたら、その接触が終わるまでパーム扱いを維持する
-                            // （接触面積は指の重みで上下するため、値に追従させると判定が漏れる）。
                             if size_mm >= 15.0 && !slot_major_palm[current_slot] {
                                 crate::audit_log(&format!(
                                     "[PALM] slot {current_slot} rejected by size ({size_mm:.1} mm)"
                                 ));
                                 slot_major_palm[current_slot] = true;
+                                palm_flipped = true;
                             }
+                        } else if ev.value() >= RAW_PALM_MAJOR_THRESHOLD
+                            && !slot_major_palm[current_slot]
+                        {
+                            // 解像度を報告しないデバイス向け: 生値のしきい値で判定する
+                            // （実測: 指先は最大でも 450 前後、手のひらは 550 以上）。
+                            crate::audit_log(&format!(
+                                "[PALM] slot {current_slot} rejected by size (raw {})",
+                                ev.value()
+                            ));
+                            slot_major_palm[current_slot] = true;
+                            palm_flipped = true;
                         }
                     } else if code == ABS_MT_TOUCH_MINOR {
                         if ev.value() > slot_peak_minor[current_slot] {
@@ -304,6 +322,22 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                             if !is_palm {
                                 *last_time = now;
                                 state.is_touched.store(true, Ordering::SeqCst);
+                            }
+                        }
+                    }
+
+                    // パームと確定した接触しか残っていない場合は、タッチ状態を
+                    // 即座に解除する（watcher の期限切れを待つと、その間に
+                    // 押されたキーが誤発火するため）。
+                    if palm_flipped {
+                        let any_non_palm = slot_active
+                            .iter()
+                            .zip(slot_is_palm.iter().zip(slot_major_palm.iter()))
+                            .any(|(&active, (&p1, &p2))| active && !p1 && !p2);
+                        if !any_non_palm && !st_contact {
+                            state.is_touched.store(false, Ordering::SeqCst);
+                            if let Ok(mut start_time) = state.contact_start_time.lock() {
+                                *start_time = None;
                             }
                         }
                     }
