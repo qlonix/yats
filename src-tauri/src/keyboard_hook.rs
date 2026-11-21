@@ -23,6 +23,8 @@ pub struct KeyboardHook {
     config: Arc<RwLock<AppConfig>>,
     tx: Sender<RemapCommand>,
     last_typing_time: Arc<Mutex<Option<std::time::Instant>>>,
+    /// 直近のキー押下履歴（タイピングのバースト検出用、Linux のみ使用）。
+    keystroke_history: Arc<Mutex<std::collections::VecDeque<std::time::Instant>>>,
 }
 
 #[derive(Clone, Debug)]
@@ -277,6 +279,7 @@ impl KeyboardHook {
             config,
             tx,
             last_typing_time: Arc::new(Mutex::new(None)),
+            keystroke_history: Arc::new(Mutex::new(std::collections::VecDeque::new())),
         }
     }
 
@@ -314,6 +317,7 @@ impl KeyboardHook {
                                 &read_unpoison(&config_inner),
                                 *lock_unpoison(&last_typing_inner),
                                 monitor_inner.contact_started_at(),
+                                None,
                                 None,
                                 now,
                             );
@@ -411,6 +415,7 @@ impl KeyboardHook {
             let monitor_ref = Arc::clone(&self.monitor);
 
             let last_typing_ref = Arc::clone(&self.last_typing_time);
+            let keystroke_history_ref = Arc::clone(&self.keystroke_history);
 
             loop {
                 // Find all keyboards
@@ -511,6 +516,7 @@ impl KeyboardHook {
                     let config_inner = Arc::clone(&config_ref);
                     let monitor_inner = Arc::clone(&monitor_ref);
                     let last_typing_inner = Arc::clone(&last_typing_ref);
+                    let keystroke_history_inner = Arc::clone(&keystroke_history_ref);
                     let v_dev = Arc::clone(&virtual_device);
 
                     threads.push(std::thread::spawn(move || {
@@ -532,6 +538,22 @@ impl KeyboardHook {
                                             1 => {
                                                 // Press
                                                 let now = std::time::Instant::now();
+                                                let keystroke_burst = {
+                                                    let mut history = lock_unpoison(
+                                                        &keystroke_history_inner,
+                                                    );
+                                                    history.push_back(now);
+                                                    while let Some(&front) = history.front() {
+                                                        if now.duration_since(front).as_millis()
+                                                            > 3000
+                                                        {
+                                                            history.pop_front();
+                                                        } else {
+                                                            break;
+                                                        }
+                                                    }
+                                                    history.len()
+                                                };
                                                 let gap_movement =
                                                     (*lock_unpoison(&last_typing_inner)).map(|lt| {
                                                         let to = now
@@ -548,6 +570,7 @@ impl KeyboardHook {
                                                     *lock_unpoison(&last_typing_inner),
                                                     monitor_inner.contact_started_at(),
                                                     gap_movement,
+                                                    Some(keystroke_burst),
                                                     now,
                                                 );
                                                 let is_palm_rejected = palm_reason.is_some();
@@ -693,6 +716,7 @@ fn palm_rejection_reason(
     last_typing: Option<std::time::Instant>,
     contact_started_at: Option<std::time::Instant>,
     gap_movement: Option<i32>,
+    keystroke_burst: Option<usize>,
     now: std::time::Instant,
 ) -> Option<&'static str> {
     if !cfg.palm_rejection {
@@ -702,17 +726,15 @@ fn palm_rejection_reason(
     if now.duration_since(last_time).as_millis() < cfg.palm_rejection_delay_ms as u128 {
         return Some("recent typing");
     }
-    // タイピングの間の誤爆は「最後のキー入力の後に親指が触れ直し、その
-    // ままカーソル移動せずに次のキーが押された」形で起きる。意図した
-    // 操作では、最後のキー入力から押下までの間に親指でカーソルを
-    // 動かしているはずなので、その間の移動量がほぼ無い場合は誤爆と
-    // みなす。押下直前 150ms は打鍵自体の揺れとして数えない。
-    // 移動量を数えるのは Linux のみ（他は None でこのルールは無効）。
-    if let (Some(movement), Some(started_at)) = (gap_movement, contact_started_at) {
-        if started_at > last_time
-            && started_at.duration_since(last_time).as_millis() < 3000
-            && movement < 60
-        {
+    // タイピング中の誤爆は、打鍵の流れの最中に起きる。直近 3 秒に
+    // 打鍵が続いている（バースト）状態で、最後のキー入力から押下
+    // までの間のカーソル移動が小さい場合は誤爆とみなす。実測では
+    // 誤爆時の移動量は最大でも 1700 程度、意図した操作はほぼ
+    // 3000 以上で、2000 を境界にした。バースト中でなければ（打ち
+    // 終わってからの操作なら）このルールは働かない。
+    // 移動量と打鍵履歴を数えるのは Linux のみ（他は None で無効）。
+    if let (Some(burst), Some(movement)) = (keystroke_burst, gap_movement) {
+        if burst >= 4 && movement < 2000 {
             return Some("typing contact");
         }
     }
