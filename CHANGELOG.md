@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows で細かい動きのスクロール量が最小でも大きすぎる問題を修正。ホイール量を 1 ノッチ (120) 単位でしか送っていなかったため、Windows ではノッチ未満の量も送れるよう送信解像度を 120 倍にし、わずかな動きでも少しずつスクロールできるようにした
 
 ### Changed
+- Windows の NSIS インストーラーのインストールモードを「現在のユーザー」に明示した。管理者権限なしで AppData\Local へインストールされる（従来も既定で同じ動作だったが、設定として固定した）。なお MSI 版はマシン全体へのインストール（管理者権限が必要）で、NSIS 版と混在させると上書きが競合するため、どちらか一方への統一を推奨
 - トレイアイコンのツールチップ（ホバー表示）を「YATS」から「YATS Ver. X.X.X」（現在のバージョン番号）へ変更
 - Linux でもトレイアイコンのバージョンが見えるようにした。Linux のトレイ実装ではツールチップがサポートされないため、「YATS Ver. X.X.X」をアイコン横のラベルにも表示する（Windows では従来どおりツールチップに表示）
 - トレイアイコンの右クリックメニューの一番下に「Ver. X.X.X」（現在のバージョン）を表示するようにした
@@ -37,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed the minimum scroll amount on Windows being too large for fine movements. Wheel amounts were only sent in whole-notch (120) steps; the send resolution on Windows is now 120 times finer so sub-notch amounts are sent and small movements scroll gradually
 
 ### Changed
+- Pinned the Windows NSIS installer mode to "current user" explicitly. It installs into AppData\Local without administrator rights (this was already the default behavior, now fixed in configuration). Note that the MSI installer is per-machine (requires administrator rights), and mixing it with the NSIS install makes upgrades conflict, so sticking to one of them is recommended
 - Changed the tray icon tooltip (hover text) from "YATS" to "YATS Ver. X.X.X" (the current version number)
 - Made the tray icon version visible on Linux as well. Tooltips are not supported by the Linux tray implementation, so "YATS Ver. X.X.X" is also shown as a label next to the icon (on Windows it appears in the tooltip as before)
 - Added the current version ("Ver. X.X.X") at the bottom of the tray icon's right-click menu

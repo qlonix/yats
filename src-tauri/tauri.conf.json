@@ -40,6 +40,11 @@
       "deb",
       "appimage"
     ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    },
     "resources": [
       "resources/*"
     ],
