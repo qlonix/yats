@@ -55,10 +55,27 @@ impl super::InputSimulation for LinuxPlatform {
         if delta == 0 {
             return;
         }
-        if let Ok(mut enigo) = Enigo::new(&Settings::default()) {
-            // enigo の正方向は下（ボタン5）、従来の rdev の正方向は上（ボタン4）。
-            // 従来と同じ方向にスクロールするよう符号を反転する。
-            let _ = enigo.scroll(delta.saturating_neg(), Axis::Vertical);
+        // delta は 1/120 ノッチ単位（Windows の WHEEL_DELTA と同じ粒度）。
+        // 高解像度ホイールとして送れれば、ボタンイベントでは作れない
+        // ノッチ未満の滑らかなスクロールになる。
+        if send_scroll_hires(delta) {
+            return;
+        }
+        // フォールバック: 整数ノッチ分だけ enigo のクリックで送り、
+        // 端数は次回に持ち越す（従来の粒度）。
+        let whole = {
+            let mut rem = crate::lock_unpoison(&SCROLL_FALLBACK_REM);
+            let total = *rem + delta;
+            let whole = total / 120;
+            *rem = total - whole * 120;
+            whole
+        };
+        if whole != 0 {
+            if let Ok(mut enigo) = Enigo::new(&Settings::default()) {
+                // enigo の正方向は下（ボタン5）、従来の rdev の正方向は上（ボタン4）。
+                // 従来と同じ方向にスクロールするよう符号を反転する。
+                let _ = enigo.scroll(whole.saturating_neg(), Axis::Vertical);
+            }
         }
     }
 }
@@ -158,6 +175,74 @@ pub fn send_mouse_scroll(delta: i32) {
 
 pub fn execute_window_action(action: WindowAction) {
     <LinuxPlatform as super::WindowManagement>::execute_window_action(action);
+}
+
+/// 高解像度スクロール送信用の uinput 仮想マウス（初回スクロール時に作る）。
+static SCROLL_DEVICE: Mutex<Option<evdev::uinput::VirtualDevice>> = Mutex::new(None);
+static SCROLL_DEVICE_FAILED: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+/// フォールバック（クリック送信）用に持ち越す 1/120 ノッチ単位の端数。
+static SCROLL_FALLBACK_REM: Mutex<i32> = Mutex::new(0);
+
+fn create_scroll_device() -> Option<evdev::uinput::VirtualDevice> {
+    let mut keys = evdev::AttributeSet::<evdev::Key>::default();
+    keys.insert(evdev::Key::BTN_LEFT);
+    keys.insert(evdev::Key::BTN_RIGHT);
+    keys.insert(evdev::Key::BTN_MIDDLE);
+    let mut axes = evdev::AttributeSet::<evdev::RelativeAxisType>::default();
+    axes.insert(evdev::RelativeAxisType::REL_X);
+    axes.insert(evdev::RelativeAxisType::REL_Y);
+    axes.insert(evdev::RelativeAxisType::REL_WHEEL);
+    axes.insert(evdev::RelativeAxisType::REL_HWHEEL);
+    axes.insert(evdev::RelativeAxisType::REL_WHEEL_HI_RES);
+    axes.insert(evdev::RelativeAxisType::REL_HWHEEL_HI_RES);
+    let dev = evdev::uinput::VirtualDeviceBuilder::new()
+        .ok()?
+        .name("YATS Virtual Scroll")
+        .with_keys(&keys)
+        .ok()?
+        .with_relative_axes(&axes)
+        .ok()?
+        .build()
+        .ok()?;
+    crate::audit_log("[SCROLL] hi-res scroll device ready");
+    Some(dev)
+}
+
+/// delta（1/120 ノッチ単位）を REL_WHEEL_HI_RES で送る。libinput 経由で
+/// XI2 の滑らかなスクロール軸としてアプリに届く。送れなければ false。
+fn send_scroll_hires(delta: i32) -> bool {
+    use std::sync::atomic::Ordering;
+    let mut guard = crate::lock_unpoison(&SCROLL_DEVICE);
+    if guard.is_none() {
+        if SCROLL_DEVICE_FAILED.load(Ordering::SeqCst) {
+            return false;
+        }
+        match create_scroll_device() {
+            Some(dev) => *guard = Some(dev),
+            None => {
+                SCROLL_DEVICE_FAILED.store(true, Ordering::SeqCst);
+                crate::audit_log("[SCROLL] hi-res scroll device unavailable, using clicks");
+                return false;
+            }
+        }
+    }
+    let Some(dev) = guard.as_mut() else {
+        return false;
+    };
+    let events = [
+        evdev::InputEvent::new(
+            evdev::EventType::RELATIVE,
+            evdev::RelativeAxisType::REL_WHEEL_HI_RES.0,
+            delta,
+        ),
+        evdev::InputEvent::new(
+            evdev::EventType::SYNCHRONIZATION,
+            evdev::Synchronization::SYN_REPORT.0,
+            0,
+        ),
+    ];
+    dev.emit(&events).is_ok()
 }
 
 struct DragState {

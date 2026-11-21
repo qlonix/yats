@@ -106,11 +106,12 @@ fn execute_action(action: Action, pressed: bool, app: &Mutex<Option<AppHandle>>)
 /// スクロール蓄積量からプラットフォームの送信単位への換算係数。
 /// Windows のホイール量は WHEEL_DELTA (120) で 1 ノッチで、ノッチ未満の量も
 /// 送れる。そのため Windows では 120 倍の解像度で蓄積し、細かい動きでも
-/// 少しずつスクロールできるようにする。Linux (enigo) は 1 単位 = 1 クリック
-/// の整数単位でしか送れないため 1 倍のまま（端数は蓄積側に残る）。
-#[cfg(target_os = "windows")]
+/// 少しずつスクロールできるようにする。Linux も uinput の高解像度ホイール
+/// （REL_WHEEL_HI_RES、120 で 1 ノッチ）で同じ粒度で送れるため 120 倍に
+/// 統一する（送れない環境では platform 側でクリック単位に丸めて送る）。
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 const SCROLL_SEND_SCALE: f32 = 120.0;
-#[cfg(not(target_os = "windows"))]
+#[cfg(not(any(target_os = "windows", target_os = "linux")))]
 const SCROLL_SEND_SCALE: f32 = 1.0;
 
 pub struct HookWorker {

@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Linux で、接触面積の解像度を報告しないタッチパッド（実測で指先は最大 450 前後、手のひらは 550 以上）でもパームリジェクションの面積判定が働くようにした。生値のしきい値（500）で判定し、手のひらと確定した接触しか残っていない場合はタッチ状態を即座に解除する
 - Linux で、タイピングの打鍵が続いている最中に、最後のキー入力から押下までの間のカーソル移動が小さいキー押下もパームとして抑止するようにした（IME 変換中の間などで置き手が残るケースの誤爆対策。移動量の実測分布から境界を設定）
+- Linux のスクロールモードの送信を、uinput の高解像度ホイール（REL_WHEEL_HI_RES）に切り替えた。Windows と同じ 1/120 ノッチ粒度で送れるため、ゆっくり動かした分が溜まって一気に流れることがなくなる。仮想デバイスを作れない環境では従来のクリック単位の送信にフォールバックする
 - Windows で、しばらく使うとクリックやスクロールが一切効かなくなる問題を修正。接触開始時刻がマウス移動などの活動でも記録されていたため、最初のタイピング以降は「接触の方が先」と判定され続け、すべてのアクションがパームリジェクションで抑止されていた。接触の開始・終了を HID レポートの接触遷移（指が触れた／離れた）だけで管理するよう変更した
 - パームリジェクションの監査ログに抑止理由（recent typing / stale contact）を記録するようにした
 
@@ -34,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - On Linux, palm rejection by contact size now also works on touchpads that report no size resolution (measured: fingertips peak around 450 raw, palms at 550+), using a raw-value threshold of 500. When only palm-classified contacts remain, the touched state is cleared immediately
 - On Linux, a key press that lands mid-typing-burst with little cursor movement since the last keystroke is now also suppressed as a palm (covers misfires from palms left resting during IME conversion pauses; the movement boundary was set from measured distributions)
+- On Linux, scroll mode now sends through a uinput hi-res wheel (REL_WHEEL_HI_RES) at the same 1/120-notch granularity as Windows, instead of whole button clicks that built up and then lurched. Falls back to click-based sending when the virtual device cannot be created
 - Fixed clicks and scroll stopping entirely on Windows after a while. The contact start time was recorded on any activity including mouse movement, so after the first typing every action was judged "contact started before typing" and suppressed by palm rejection. Contact start/end is now tracked only from HID contact transitions (finger down / finger up)
 - Palm rejection audit log entries now record the rejection reason (recent typing / stale contact)
 
