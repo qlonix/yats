@@ -146,6 +146,23 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
     let mut last_abs_y: Option<i32> = None;
     let mut accum_x: i32 = 0;
     let mut accum_y: i32 = 0;
+    // 直近の移動履歴を記録する（タイピング中の置き手との切り分け用）。
+    let record_movement = |amount: i32| {
+        if amount == 0 {
+            return;
+        }
+        let now = std::time::Instant::now();
+        if let Ok(mut events) = state.movement_events.lock() {
+            events.push_back((now, amount));
+            while let Some(&(time, _)) = events.front() {
+                if now.duration_since(time).as_millis() > 600 {
+                    events.pop_front();
+                } else {
+                    break;
+                }
+            }
+        }
+    };
     let mut _last_dir_y: i32 = 0;
 
     // Track touch slots and palm state
@@ -313,12 +330,6 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                                     slot_active.iter().any(|&active| active) || st_contact;
                                 if let Ok(mut start_time) = state.contact_start_time.lock() {
                                     if any_active {
-                                        if start_time.is_none() {
-                                            // 新しい接触の開始で累計移動量をリセット
-                                            state
-                                                .contact_movement
-                                                .store(0, Ordering::SeqCst);
-                                        }
                                         start_time.get_or_insert(now);
                                     } else {
                                         *start_time = None;
@@ -369,9 +380,7 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                                         accum_y = 0;
                                         _last_dir_y = 0;
                                     } else {
-                                        state
-                                            .contact_movement
-                                            .fetch_add(delta.abs(), Ordering::SeqCst);
+                                        record_movement(delta.abs());
                                         accum_x += delta;
                                         if accum_x.abs() >= ACCUM_THRESHOLD {
                                             let output = if accum_x.abs() < ACCUM_THRESHOLD * 2 {
@@ -400,9 +409,7 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                                         accum_y = 0;
                                         _last_dir_y = 0;
                                     } else {
-                                        state
-                                            .contact_movement
-                                            .fetch_add(delta.abs(), Ordering::SeqCst);
+                                        record_movement(delta.abs());
                                         accum_y += delta;
                                         if accum_y.abs() >= ACCUM_THRESHOLD {
                                             let output = if accum_y.abs() < ACCUM_THRESHOLD * 2 {
@@ -434,16 +441,12 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                         match ev.code() {
                             0 => {
                                 // REL_X
-                                state
-                                    .contact_movement
-                                    .fetch_add(ev.value().abs(), Ordering::SeqCst);
+                                record_movement(ev.value().abs());
                                 state.x_delta.fetch_add(ev.value(), Ordering::SeqCst);
                             }
                             1 => {
                                 // REL_Y
-                                state
-                                    .contact_movement
-                                    .fetch_add(ev.value().abs(), Ordering::SeqCst);
+                                record_movement(ev.value().abs());
                                 state.y_delta.fetch_add(ev.value(), Ordering::SeqCst);
                             }
                             _ => {}

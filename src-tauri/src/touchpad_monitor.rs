@@ -1,6 +1,6 @@
 use crate::platform::touchpad;
 use crate::{audit_log, lock_unpoison};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
@@ -15,9 +15,9 @@ pub struct MonitorState {
     pub contact_start_time: Mutex<Option<std::time::Instant>>,
     pub x_delta: AtomicI32,
     pub y_delta: AtomicI32,
-    /// 現在の接触が始まってからの累計移動量（|dx|+|dy|、デバイス単位）。
-    /// タイピング中の置き手と意図した操作を見分けるために使う（Linux のみ更新）。
-    pub contact_movement: AtomicI32,
+    /// 直近の移動イベント履歴（時刻, |delta|）。タイピング中の置き手と
+    /// 意図した操作を「直前に動かしたか」で見分けるために使う（Linux のみ記録）。
+    pub movement_events: Mutex<VecDeque<(std::time::Instant, i32)>>,
     pub release_delay_ms: AtomicU32,
     pub app_handle: Arc<Mutex<Option<AppHandle>>>,
     #[cfg(target_os = "windows")]
@@ -46,7 +46,7 @@ impl TouchpadMonitor {
             contact_start_time: Mutex::new(None),
             x_delta: AtomicI32::new(0),
             y_delta: AtomicI32::new(0),
-            contact_movement: AtomicI32::new(0),
+            movement_events: Mutex::new(VecDeque::new()),
             release_delay_ms: AtomicU32::new(150),
             app_handle,
             #[cfg(target_os = "windows")]
@@ -173,8 +173,22 @@ impl TouchpadMonitor {
         *lock_unpoison(&self.state.contact_start_time)
     }
 
-    pub fn current_contact_movement(&self) -> i32 {
-        self.state.contact_movement.load(Ordering::SeqCst)
+    /// 直近 window_ms 以内の移動量合計（デバイス単位）。
+    pub fn recent_movement(&self, window_ms: u64) -> i32 {
+        let now = std::time::Instant::now();
+        let mut events = lock_unpoison(&self.state.movement_events);
+        while let Some(&(time, _)) = events.front() {
+            if now.duration_since(time).as_millis() > 600 {
+                events.pop_front();
+            } else {
+                break;
+            }
+        }
+        events
+            .iter()
+            .filter(|&&(time, _)| now.duration_since(time).as_millis() <= window_ms as u128)
+            .map(|&(_, amount)| amount)
+            .sum()
     }
 
     pub fn consume_y_delta(&self) -> i32 {

@@ -34,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - On Linux, palm rejection by contact size now also works on touchpads that report no size resolution (measured: fingertips peak around 450 raw, palms at 550+), using a raw-value threshold of 500. When only palm-classified contacts remain, the touched state is cleared immediately
+- On Linux, a key press during a contact that started shortly after the last keystroke and has barely moved is now also suppressed as a palm (covers misfires from palms left resting during IME conversion pauses)
+- On Linux, Window Drag now moves windows through the window manager's interactive move (_NET_WM_MOVERESIZE). The previous methods were clamped to the screen by WM policy; the interactive move is treated like a title-bar drag and allows partial off-screen positions
 - Fixed clicks and scroll stopping entirely on Windows after a while. The contact start time was recorded on any activity including mouse movement, so after the first typing every action was judged "contact started before typing" and suppressed by palm rejection. Contact start/end is now tracked only from HID contact transitions (finger down / finger up)
 - Palm rejection audit log entries now record the rejection reason (recent typing / stale contact)
 
