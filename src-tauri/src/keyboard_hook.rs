@@ -575,7 +575,11 @@ impl KeyboardHook {
                                                     };
                                                     if let Some(action) = action {
                                                         crate::audit_log(&format!(
-                                                            "[TRIGGER] key={rkey:?} fired"
+                                                            "[TRIGGER] key={rkey:?} fired (gap={})",
+                                                            gap_movement.map_or_else(
+                                                                || "-".to_string(),
+                                                                |v| v.to_string()
+                                                            )
                                                         ));
                                                         pressed_keys.insert(rkey, action.clone());
                                                         match action {
@@ -609,7 +613,11 @@ impl KeyboardHook {
                                                     {
                                                         if let Some(reason) = palm_reason {
                                                             crate::audit_log(&format!(
-                                                                "[PALM] key={rkey:?} rejected ({reason})"
+                                                                "[PALM] key={rkey:?} rejected ({reason}) (gap={})",
+                                                                gap_movement.map_or_else(
+                                                                    || "-".to_string(),
+                                                                    |v| v.to_string()
+                                                                )
                                                             ));
                                                         }
                                                     }
