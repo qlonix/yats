@@ -545,7 +545,7 @@ impl KeyboardHook {
                                                     history.push_back(now);
                                                     while let Some(&front) = history.front() {
                                                         if now.duration_since(front).as_millis()
-                                                            > 3000
+                                                            > 5000
                                                         {
                                                             history.pop_front();
                                                         } else {
@@ -726,7 +726,7 @@ fn palm_rejection_reason(
     if now.duration_since(last_time).as_millis() < cfg.palm_rejection_delay_ms as u128 {
         return Some("recent typing");
     }
-    // タイピング中の誤爆は、打鍵の流れの最中に起きる。直近 3 秒に
+    // タイピング中の誤爆は、打鍵の流れの最中に起きる。直近 5 秒に
     // 打鍵が続いている（バースト）状態で、最後のキー入力から押下
     // までの間のカーソル移動が小さい場合は誤爆とみなす。実測では
     // 誤爆時の移動量は最大でも 1700 程度、意図した操作はほぼ
