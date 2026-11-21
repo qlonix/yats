@@ -39,4 +39,4 @@ evdev = "0.12"
 nix = { version = "0.27", features = ["user"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-x11rb = "0.13"
+x11rb = { version = "0.13", features = ["xtest"] }

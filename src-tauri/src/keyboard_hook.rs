@@ -314,6 +314,7 @@ impl KeyboardHook {
                                 &read_unpoison(&config_inner),
                                 *lock_unpoison(&last_typing_inner),
                                 monitor_inner.contact_started_at(),
+                                None,
                                 now,
                             );
                             let is_palm_rejected = palm_reason.is_some();
@@ -535,6 +536,7 @@ impl KeyboardHook {
                                                     &read_unpoison(&config_inner),
                                                     *lock_unpoison(&last_typing_inner),
                                                     monitor_inner.contact_started_at(),
+                                                    Some(monitor_inner.current_contact_movement()),
                                                     now,
                                                 );
                                                 let is_palm_rejected = palm_reason.is_some();
@@ -671,6 +673,7 @@ fn palm_rejection_reason(
     cfg: &AppConfig,
     last_typing: Option<std::time::Instant>,
     contact_started_at: Option<std::time::Instant>,
+    contact_movement: Option<i32>,
     now: std::time::Instant,
 ) -> Option<&'static str> {
     if !cfg.palm_rejection {
@@ -678,12 +681,24 @@ fn palm_rejection_reason(
     }
     let last_time = last_typing?;
     if now.duration_since(last_time).as_millis() < cfg.palm_rejection_delay_ms as u128 {
-        Some("recent typing")
-    } else if contact_started_at.is_some_and(|started_at| started_at < last_time) {
-        Some("stale contact")
-    } else {
-        None
+        return Some("recent typing");
     }
+    // タイピングの合間に置かれた手は、接触が始まってからほとんど動かない。
+    // 最後のキー入力から間もなく始まり、実質移動していない接触でのキー
+    // 押下は誤爆とみなす（意図した操作はカーソル移動を伴うことが多い）。
+    // 移動量を数えるのは Linux のみ（他は None でこのルールは無効）。
+    if let (Some(movement), Some(started_at)) = (contact_movement, contact_started_at) {
+        if started_at > last_time
+            && started_at.duration_since(last_time).as_millis() < 5000
+            && movement < 80
+        {
+            return Some("typing contact");
+        }
+    }
+    if contact_started_at.is_some_and(|started_at| started_at < last_time) {
+        return Some("stale contact");
+    }
+    None
 }
 
 fn compute_scroll_addition(

@@ -313,6 +313,12 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                                     slot_active.iter().any(|&active| active) || st_contact;
                                 if let Ok(mut start_time) = state.contact_start_time.lock() {
                                     if any_active {
+                                        if start_time.is_none() {
+                                            // 新しい接触の開始で累計移動量をリセット
+                                            state
+                                                .contact_movement
+                                                .store(0, Ordering::SeqCst);
+                                        }
                                         start_time.get_or_insert(now);
                                     } else {
                                         *start_time = None;
@@ -363,6 +369,9 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                                         accum_y = 0;
                                         _last_dir_y = 0;
                                     } else {
+                                        state
+                                            .contact_movement
+                                            .fetch_add(delta.abs(), Ordering::SeqCst);
                                         accum_x += delta;
                                         if accum_x.abs() >= ACCUM_THRESHOLD {
                                             let output = if accum_x.abs() < ACCUM_THRESHOLD * 2 {
@@ -391,6 +400,9 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                                         accum_y = 0;
                                         _last_dir_y = 0;
                                     } else {
+                                        state
+                                            .contact_movement
+                                            .fetch_add(delta.abs(), Ordering::SeqCst);
                                         accum_y += delta;
                                         if accum_y.abs() >= ACCUM_THRESHOLD {
                                             let output = if accum_y.abs() < ACCUM_THRESHOLD * 2 {
@@ -422,10 +434,16 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                         match ev.code() {
                             0 => {
                                 // REL_X
+                                state
+                                    .contact_movement
+                                    .fetch_add(ev.value().abs(), Ordering::SeqCst);
                                 state.x_delta.fetch_add(ev.value(), Ordering::SeqCst);
                             }
                             1 => {
                                 // REL_Y
+                                state
+                                    .contact_movement
+                                    .fetch_add(ev.value().abs(), Ordering::SeqCst);
                                 state.y_delta.fetch_add(ev.value(), Ordering::SeqCst);
                             }
                             _ => {}

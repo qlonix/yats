@@ -15,6 +15,9 @@ pub struct MonitorState {
     pub contact_start_time: Mutex<Option<std::time::Instant>>,
     pub x_delta: AtomicI32,
     pub y_delta: AtomicI32,
+    /// 現在の接触が始まってからの累計移動量（|dx|+|dy|、デバイス単位）。
+    /// タイピング中の置き手と意図した操作を見分けるために使う（Linux のみ更新）。
+    pub contact_movement: AtomicI32,
     pub release_delay_ms: AtomicU32,
     pub app_handle: Arc<Mutex<Option<AppHandle>>>,
     #[cfg(target_os = "windows")]
@@ -43,6 +46,7 @@ impl TouchpadMonitor {
             contact_start_time: Mutex::new(None),
             x_delta: AtomicI32::new(0),
             y_delta: AtomicI32::new(0),
+            contact_movement: AtomicI32::new(0),
             release_delay_ms: AtomicU32::new(150),
             app_handle,
             #[cfg(target_os = "windows")]
@@ -167,6 +171,10 @@ impl TouchpadMonitor {
 
     pub fn contact_started_at(&self) -> Option<std::time::Instant> {
         *lock_unpoison(&self.state.contact_start_time)
+    }
+
+    pub fn current_contact_movement(&self) -> i32 {
+        self.state.contact_movement.load(Ordering::SeqCst)
     }
 
     pub fn consume_y_delta(&self) -> i32 {
