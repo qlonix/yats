@@ -158,16 +158,10 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
     // 解像度を報告しないデバイス向けのパーム判定しきい値（TOUCH_MAJOR の生値）。
     // 実測では指先の接触は最大でも 450 前後、手のひらは 550 以上だった。
     const RAW_PALM_MAJOR_THRESHOLD: i32 = 500;
-    // パーム判定の調整用に、接触ごとの各軸の最大値を記録する（診断ビルド用）
-    let mut slot_peak_major = [0i32; 16];
-    let mut slot_peak_minor = [0i32; 16];
-    let mut slot_peak_width = [0i32; 16];
 
     const ABS_MT_SLOT: u16 = 0x2f;
     const ABS_MT_TOOL_TYPE: u16 = AbsoluteAxisType::ABS_MT_TOOL_TYPE.0;
     const ABS_MT_TOUCH_MAJOR: u16 = AbsoluteAxisType::ABS_MT_TOUCH_MAJOR.0;
-    const ABS_MT_TOUCH_MINOR: u16 = AbsoluteAxisType::ABS_MT_TOUCH_MINOR.0;
-    const ABS_MT_WIDTH_MAJOR: u16 = AbsoluteAxisType::ABS_MT_WIDTH_MAJOR.0;
     const ABS_MT_TRACKING_ID: u16 = 0x39;
     const BTN_TOUCH: u16 = 330;
 
@@ -224,20 +218,6 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                         if value >= 0 {
                             slot_active[current_slot] = true;
                         } else if value == -1 {
-                            if slot_peak_major[current_slot] > 0
-                                || slot_peak_minor[current_slot] > 0
-                                || slot_peak_width[current_slot] > 0
-                            {
-                                crate::audit_log(&format!(
-                                    "[PALM-DIAG] slot {current_slot} end peak_major={} peak_minor={} peak_width={}",
-                                    slot_peak_major[current_slot],
-                                    slot_peak_minor[current_slot],
-                                    slot_peak_width[current_slot],
-                                ));
-                            }
-                            slot_peak_major[current_slot] = 0;
-                            slot_peak_minor[current_slot] = 0;
-                            slot_peak_width[current_slot] = 0;
                             slot_active[current_slot] = false;
                             slot_is_palm[current_slot] = false;
                             slot_major_palm[current_slot] = false;
@@ -255,9 +235,6 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                             slot_is_palm[current_slot] = is_palm;
                         }
                     } else if code == ABS_MT_TOUCH_MAJOR {
-                        if ev.value() > slot_peak_major[current_slot] {
-                            slot_peak_major[current_slot] = ev.value();
-                        }
                         // 一度しきい値を超えたら、その接触が終わるまでパーム扱いを維持する
                         // （接触面積は指の重みで上下するため、値に追従させると判定が漏れる）。
                         if major_resolution > 0 {
@@ -280,14 +257,6 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                             ));
                             slot_major_palm[current_slot] = true;
                             palm_flipped = true;
-                        }
-                    } else if code == ABS_MT_TOUCH_MINOR {
-                        if ev.value() > slot_peak_minor[current_slot] {
-                            slot_peak_minor[current_slot] = ev.value();
-                        }
-                    } else if code == ABS_MT_WIDTH_MAJOR {
-                        if ev.value() > slot_peak_width[current_slot] {
-                            slot_peak_width[current_slot] = ev.value();
                         }
                     }
                 } else if contact_event {
