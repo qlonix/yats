@@ -146,23 +146,7 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
     let mut last_abs_y: Option<i32> = None;
     let mut accum_x: i32 = 0;
     let mut accum_y: i32 = 0;
-    // 直近の移動履歴を記録する（タイピング中の置き手との切り分け用）。
-    let record_movement = |amount: i32| {
-        if amount == 0 {
-            return;
-        }
-        let now = std::time::Instant::now();
-        if let Ok(mut events) = state.movement_events.lock() {
-            events.push_back((now, amount));
-            while let Some(&(time, _)) = events.front() {
-                if now.duration_since(time).as_millis() > 3500 {
-                    events.pop_front();
-                } else {
-                    break;
-                }
-            }
-        }
-    };
+
     let mut _last_dir_y: i32 = 0;
 
     // Track touch slots and palm state
@@ -380,7 +364,7 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                                         accum_y = 0;
                                         _last_dir_y = 0;
                                     } else {
-                                        record_movement(delta.abs());
+
                                         accum_x += delta;
                                         if accum_x.abs() >= ACCUM_THRESHOLD {
                                             let output = if accum_x.abs() < ACCUM_THRESHOLD * 2 {
@@ -409,7 +393,7 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                                         accum_y = 0;
                                         _last_dir_y = 0;
                                     } else {
-                                        record_movement(delta.abs());
+
                                         accum_y += delta;
                                         if accum_y.abs() >= ACCUM_THRESHOLD {
                                             let output = if accum_y.abs() < ACCUM_THRESHOLD * 2 {
@@ -441,12 +425,12 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
                         match ev.code() {
                             0 => {
                                 // REL_X
-                                record_movement(ev.value().abs());
+
                                 state.x_delta.fetch_add(ev.value(), Ordering::SeqCst);
                             }
                             1 => {
                                 // REL_Y
-                                record_movement(ev.value().abs());
+
                                 state.y_delta.fetch_add(ev.value(), Ordering::SeqCst);
                             }
                             _ => {}

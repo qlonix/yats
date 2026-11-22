@@ -140,6 +140,7 @@ pub fn cursor_freeze_begin(monitor: &TouchpadMonitor, _anchor: (i32, i32)) {
         .state
         .cursor_freeze
         .store(true, std::sync::atomic::Ordering::SeqCst);
+    linux::prepare_scroll_route();
 }
 
 #[cfg(target_os = "windows")]
@@ -162,6 +163,7 @@ pub fn cursor_freeze_end(monitor: &TouchpadMonitor) {
         .state
         .cursor_freeze
         .store(false, std::sync::atomic::Ordering::SeqCst);
+    linux::clear_scroll_route();
 }
 
 pub fn cursor_freeze_reset() {

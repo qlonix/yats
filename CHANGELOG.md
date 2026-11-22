@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Linux で、接触面積の解像度を報告しないタッチパッド（実測で指先は最大 450 前後、手のひらは 550 以上）でもパームリジェクションの面積判定が働くようにした。生値のしきい値（500）で判定し、手のひらと確定した接触しか残っていない場合はタッチ状態を即座に解除する
-- Linux のスクロールモードの送信を、uinput の仮想ホイールデバイスに切り替えた。1 ノッチ分が完成した時点で離散イベントと高解像度イベントを併せて送る（ノッチ未満の刻みは GTK 系アプリが切り捨ててしまうため）。仮想デバイスを作れない環境では従来のクリック単位の送信にフォールバックする
+- Linux のスクロールモードの送信を、対象ウィンドウで切り替えるようにした。ブラウザ（WM_CLASS で判定）は uinput の仮想ホイールから高解像度ホイールイベントを送り、細かい刻みで滑らかにスクロールする。それ以外は従来どおりボタンイベントで送る（仮想ホイールの valuator は GTK 系アプリではスクロールとして解釈されないため）
 - Windows で、しばらく使うとクリックやスクロールが一切効かなくなる問題を修正。接触開始時刻がマウス移動などの活動でも記録されていたため、最初のタイピング以降は「接触の方が先」と判定され続け、すべてのアクションがパームリジェクションで抑止されていた。接触の開始・終了を HID レポートの接触遷移（指が触れた／離れた）だけで管理するよう変更した
 - パームリジェクションの監査ログに抑止理由を記録するようにした
 
@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - On Linux, palm rejection by contact size now also works on touchpads that report no size resolution (measured: fingertips peak around 450 raw, palms at 550+), using a raw-value threshold of 500. When only palm-classified contacts remain, the touched state is cleared immediately
-- On Linux, scroll mode now sends through a uinput virtual wheel device, emitting the discrete and hi-res events together once a full notch has accumulated (GTK apps discard sub-notch valuator changes). Falls back to click-based sending when the virtual device cannot be created
+- On Linux, scroll mode now picks its send path by the target window: browsers (detected via WM_CLASS) receive hi-res wheel events from a uinput virtual wheel for fine-grained smooth scrolling, while other apps keep receiving button events as before (GTK apps do not interpret the virtual wheel's valuators as scrolling)
 - Fixed clicks and scroll stopping entirely on Windows after a while. The contact start time was recorded on any activity including mouse movement, so after the first typing every action was judged "contact started before typing" and suppressed by palm rejection. Contact start/end is now tracked only from HID contact transitions (finger down / finger up)
 - Palm rejection audit log entries now record the rejection reason
 

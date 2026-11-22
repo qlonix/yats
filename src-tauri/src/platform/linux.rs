@@ -56,27 +56,16 @@ impl super::InputSimulation for LinuxPlatform {
             return;
         }
         // delta は 1/120 ノッチ単位（Windows の WHEEL_DELTA と同じ粒度）。
-        // 高解像度ホイールとして送れれば、ボタンイベントでは作れない
-        // ノッチ未満の滑らかなスクロールになる。
-        if send_scroll_hires(delta) {
+        // 送信経路はスクロール開始時にポインタ下のウィンドウで決める
+        // （prepare_scroll_route）。ブラウザは仮想ホイールの細かい
+        // valuator を自分で読んで滑らかにスクロールするが、GTK 系は
+        // その経路では一切スクロールしない（実機確認済み）ため、
+        // それ以外は従来どおりコアポインタのクリックで送る。
+        let route = *crate::lock_unpoison(&SCROLL_ROUTE);
+        if route == Some(ScrollRoute::Device) && send_scroll_hires(delta) {
             return;
         }
-        // フォールバック: 整数ノッチ分だけ enigo のクリックで送り、
-        // 端数は次回に持ち越す（従来の粒度）。
-        let whole = {
-            let mut rem = crate::lock_unpoison(&SCROLL_FALLBACK_REM);
-            let total = *rem + delta;
-            let whole = total / 120;
-            *rem = total - whole * 120;
-            whole
-        };
-        if whole != 0 {
-            if let Ok(mut enigo) = Enigo::new(&Settings::default()) {
-                // enigo の正方向は下（ボタン5）、従来の rdev の正方向は上（ボタン4）。
-                // 従来と同じ方向にスクロールするよう符号を反転する。
-                let _ = enigo.scroll(whole.saturating_neg(), Axis::Vertical);
-            }
-        }
+        send_scroll_clicks(delta);
     }
 }
 
@@ -177,6 +166,123 @@ pub fn execute_window_action(action: WindowAction) {
     <LinuxPlatform as super::WindowManagement>::execute_window_action(action);
 }
 
+/// スクロールの送信経路。Device = 仮想ホイール（ブラウザ向け）、
+/// Clicks = コアポインタのボタンイベント（それ以外）。
+#[derive(Clone, Copy, PartialEq)]
+enum ScrollRoute {
+    Device,
+    Clicks,
+}
+static SCROLL_ROUTE: Mutex<Option<ScrollRoute>> = Mutex::new(None);
+
+/// スクロール開始時に、ポインタ下のウィンドウの WM_CLASS を見て
+/// 送信経路を決める。ブラウザ系（valuator を自分で読む）だけを
+/// 仮想ホイール経路にし、それ以外はクリック経路にする。
+pub fn prepare_scroll_route() {
+    let class = window_class_under_pointer().unwrap_or_default();
+    let browser = ["firefox", "zen", "chrom", "brave", "vivaldi", "opera", "edge"]
+        .iter()
+        .any(|token| class.contains(token));
+    let route = if browser {
+        ScrollRoute::Device
+    } else {
+        ScrollRoute::Clicks
+    };
+    crate::audit_log(&format!(
+        "[SCROLL] route={} (class={})",
+        if browser { "device" } else { "clicks" },
+        if class.is_empty() { "-" } else { &class }
+    ));
+    *crate::lock_unpoison(&SCROLL_ROUTE) = Some(route);
+}
+
+pub fn clear_scroll_route() {
+    *crate::lock_unpoison(&SCROLL_ROUTE) = None;
+}
+
+/// ポインタ配下のクライアントウィンドウの WM_CLASS を小文字で返す
+/// （インスタンス名とクラス名の連結）。取得できなければ None。
+fn window_class_under_pointer() -> Option<String> {
+    let (conn, screen_num) = RustConnection::connect(None).ok()?;
+    let screen = conn.setup().roots.get(screen_num)?;
+    let root = screen.root;
+    let intern = |name: &[u8]| {
+        conn.intern_atom(false, name)
+            .ok()
+            .and_then(|cookie| cookie.reply().ok())
+            .map(|reply| reply.atom)
+    };
+    let mut chain: Vec<u32> = Vec::new();
+    let mut current = root;
+    loop {
+        let reply = conn
+            .query_pointer(current)
+            .ok()
+            .and_then(|cookie| cookie.reply().ok())?;
+        if reply.child == 0 {
+            break;
+        }
+        chain.push(reply.child);
+        current = reply.child;
+        if chain.len() >= 16 {
+            break;
+        }
+    }
+    if chain.is_empty() {
+        return None;
+    }
+    let client_list: Vec<u32> = intern(b"_NET_CLIENT_LIST")
+        .and_then(|atom| {
+            conn.get_property(false, root, atom, AtomEnum::WINDOW, 0, u32::MAX)
+                .ok()
+                .and_then(|cookie| cookie.reply().ok())
+        })
+        .and_then(|reply| reply.value32().map(|values| values.collect()))
+        .unwrap_or_default();
+    let mut window = chain.iter().copied().find(|w| client_list.contains(w));
+    if window.is_none() {
+        if let Some(wm_state_atom) = intern(b"WM_STATE") {
+            window = chain.iter().copied().find(|&w| {
+                conn.get_property(false, w, wm_state_atom, AtomEnum::ANY, 0, 0)
+                    .ok()
+                    .and_then(|cookie| cookie.reply().ok())
+                    .map(|reply| reply.type_ != 0)
+                    .unwrap_or(false)
+            });
+        }
+    }
+    let window = window.unwrap_or(chain[0]);
+    let reply = conn
+        .get_property(false, window, AtomEnum::WM_CLASS, AtomEnum::STRING, 0, 64)
+        .ok()
+        .and_then(|cookie| cookie.reply().ok())?;
+    let text = String::from_utf8_lossy(&reply.value).replace('\0', " ");
+    let text = text.trim().to_lowercase();
+    if text.is_empty() {
+        None
+    } else {
+        Some(text)
+    }
+}
+
+/// 整数ノッチ分だけ enigo のクリックで送り、端数は次回に持ち越す。
+fn send_scroll_clicks(delta: i32) {
+    let whole = {
+        let mut rem = crate::lock_unpoison(&SCROLL_FALLBACK_REM);
+        let total = *rem + delta;
+        let whole = total / 120;
+        *rem = total - whole * 120;
+        whole
+    };
+    if whole != 0 {
+        if let Ok(mut enigo) = Enigo::new(&Settings::default()) {
+            // enigo の正方向は下（ボタン5）、従来の rdev の正方向は上（ボタン4）。
+            // 従来と同じ方向にスクロールするよう符号を反転する。
+            let _ = enigo.scroll(whole.saturating_neg(), Axis::Vertical);
+        }
+    }
+}
+
 /// 高解像度スクロール送信用の uinput 仮想マウス（初回スクロール時に作る）。
 static SCROLL_DEVICE: Mutex<Option<evdev::uinput::VirtualDevice>> = Mutex::new(None);
 static SCROLL_DEVICE_FAILED: std::sync::atomic::AtomicBool =
@@ -233,10 +339,10 @@ fn send_scroll_hires(delta: i32) -> bool {
     let Some(dev) = guard.as_mut() else {
         return false;
     };
-    // 1 ノッチ（120）に満たない量は送らずに貯める。GTK 系アプリは
-    // ノッチ未満の valuator 変化を切り捨ててしまうため、細かい刻みで
-    // 送ると一切スクロールしない（ブラウザは自分で蓄積するので効く）。
-    // 完成したノッチ分だけを REL_WHEEL（離散）と HI_RES の両方で送る。
+    // 細かい刻みの HI_RES をそのまま送り、累計が 1 ノッチを超えたら
+    // REL_WHEEL（離散）も同じフレームで併せて送る（実機の hi-res
+    // ホイールと同じ作法）。この経路は valuator を自分で読むブラウザ
+    // 専用で、滑らかさはこの細かい刻みから来る。
     let detents = {
         let mut acc = crate::lock_unpoison(&SCROLL_HIRES_ACC);
         *acc += delta;
@@ -244,26 +350,24 @@ fn send_scroll_hires(delta: i32) -> bool {
         *acc -= detents * 120;
         detents
     };
-    if detents == 0 {
-        return true;
-    }
-    let events = [
-        evdev::InputEvent::new(
+    let mut events = Vec::with_capacity(3);
+    if detents != 0 {
+        events.push(evdev::InputEvent::new(
             evdev::EventType::RELATIVE,
             evdev::RelativeAxisType::REL_WHEEL.0,
             detents,
-        ),
-        evdev::InputEvent::new(
-            evdev::EventType::RELATIVE,
-            evdev::RelativeAxisType::REL_WHEEL_HI_RES.0,
-            detents * 120,
-        ),
-        evdev::InputEvent::new(
-            evdev::EventType::SYNCHRONIZATION,
-            evdev::Synchronization::SYN_REPORT.0,
-            0,
-        ),
-    ];
+        ));
+    }
+    events.push(evdev::InputEvent::new(
+        evdev::EventType::RELATIVE,
+        evdev::RelativeAxisType::REL_WHEEL_HI_RES.0,
+        delta,
+    ));
+    events.push(evdev::InputEvent::new(
+        evdev::EventType::SYNCHRONIZATION,
+        evdev::Synchronization::SYN_REPORT.0,
+        0,
+    ));
     dev.emit(&events).is_ok()
 }
 

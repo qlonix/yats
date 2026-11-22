@@ -1,6 +1,6 @@
 use crate::platform::touchpad;
 use crate::{audit_log, lock_unpoison};
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
@@ -15,9 +15,6 @@ pub struct MonitorState {
     pub contact_start_time: Mutex<Option<std::time::Instant>>,
     pub x_delta: AtomicI32,
     pub y_delta: AtomicI32,
-    /// 直近の移動イベント履歴（時刻, |delta|）。タイピング中の置き手と
-    /// 意図した操作を「直前に動かしたか」で見分けるために使う（Linux のみ記録）。
-    pub movement_events: Mutex<VecDeque<(std::time::Instant, i32)>>,
     pub release_delay_ms: AtomicU32,
     pub app_handle: Arc<Mutex<Option<AppHandle>>>,
     #[cfg(target_os = "windows")]
@@ -46,7 +43,6 @@ impl TouchpadMonitor {
             contact_start_time: Mutex::new(None),
             x_delta: AtomicI32::new(0),
             y_delta: AtomicI32::new(0),
-            movement_events: Mutex::new(VecDeque::new()),
             release_delay_ms: AtomicU32::new(150),
             app_handle,
             #[cfg(target_os = "windows")]
@@ -167,34 +163,6 @@ impl TouchpadMonitor {
 
     pub fn is_touched(&self) -> bool {
         self.state.is_touched.load(Ordering::SeqCst)
-    }
-
-    pub fn contact_started_at(&self) -> Option<std::time::Instant> {
-        *lock_unpoison(&self.state.contact_start_time)
-    }
-
-    /// from から to の間の移動量合計（デバイス単位）。
-    /// 「最後のキー入力からキー押下までの間にカーソル移動があったか」を
-    /// 測るために使う。履歴は直近 3.5 秒分を保持する。
-    pub fn movement_between(
-        &self,
-        from: std::time::Instant,
-        to: std::time::Instant,
-    ) -> i32 {
-        let now = std::time::Instant::now();
-        let mut events = lock_unpoison(&self.state.movement_events);
-        while let Some(&(time, _)) = events.front() {
-            if now.duration_since(time).as_millis() > 3500 {
-                events.pop_front();
-            } else {
-                break;
-            }
-        }
-        events
-            .iter()
-            .filter(|&&(time, _)| time > from && time < to)
-            .map(|&(_, amount)| amount)
-            .sum()
     }
 
     pub fn consume_y_delta(&self) -> i32 {
