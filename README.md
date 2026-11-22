@@ -10,7 +10,7 @@
 
 YATS のトリガー検出は、プラットフォームで方式が異なります。
 
-Linux では、ThumbSense と同様にタッチパッドへの接触そのものを検出します。そのため、カーソルが止まっていても、指が触れている間（および指を離してから Release Delay の間）のキー押下でトリガーが発火します。パームリジェクションとして、接触面積による手のひら判定も行います。
+Linux では、ThumbSense と同様にタッチパッドへの接触そのものを検出します。そのため、カーソルが止まっていても、指が触れている間（および指を離してから Release Delay の間）のキー押下でトリガーが発火します。検出は標準の evdev インターフェース経由なのでベンダーに依存せず、接触状態を evdev で取得できるタッチパッドであれば、Synaptics / ALPS 製でなくても動作します。パームリジェクションとして、接触面積による手のひら判定も行います。
 
 Windows では、マウスカーソルが動いているかどうか（+止まってから一定時間の猶予）をトリガーとしています。そのため ThumbSense ほど精度の高いトリガー検出はできませんが、その代わり Synaptics/ALPS 以外のタッチパッドでも動作することができます。タッチパッドである必要すらないので、トラックポイントや [Nape Pro](https://www.gizmodo.jp/2025/11/gizmart-nape-pro.html) と組み合わせての操作も可能です（Precision Touchpad 搭載機種では、接触情報をパームリジェクションにも利用します）。
 
@@ -19,7 +19,7 @@ Windows では、マウスカーソルが動いているかどうか（+止ま�
 - **カスタマイズ可能なアクション**:
   - マウスクリック (左、右、中、ダブルクリック)
   - キーボードマクロ
-  - ウィンドウ操作 (閉じる、最大化/元に戻す、最小化)
+  - ウィンドウ操作 (閉じる、最大化/元に戻す、最小化、ドラッグ移動)
   - スクロール
 - **スクロール調整 (Scroll Tuning)**:
   - 加速度カーブをグラフで編集でき、出力軸 (Min/Max Scroll Output Speed) と入力軸の上限 (Max Input Speed) を変更すると、カーブが形を保ったまま伸縮します
@@ -98,6 +98,7 @@ chmod +x yats_*.AppImage
 ```
 
 #### 既知の制限 (Linux)
+- **パームリジェクション（発展途上）**: Linux 版のパームリジェクションは現在も改善中です。接触面積による手のひら判定と、タイピング直後のキー押下の抑止（Palm Delay）を組み合わせていますが、デバイスや使い方によっては、意図した操作が抑止されたり、タイピング中の誤発火が残ったりする場合があります。
 - **Wayland 環境**: ウィンドウ操作（`xdotool` を使用する機能）は Wayland 上では動作しない場合があります。リマップやスクロール機能は動作します。
 - **権限**: デバイスへのアクセス権限が不足していると、キーのリマップが機能しません。必ず上記の udev ルールまたはグループ設定を確認してください。
 
@@ -113,9 +114,7 @@ chmod +x yats_*.AppImage
 
 # YATS (Yet Another Touchpad Shortcut)
 
-Press keys immediately after moving the mouse cursor to perform mouse button clicks, key macros, window operations, and more.
-
-It is designed to be used by pressing keys while touching the touchpad.
+Press keys while touching the touchpad to perform mouse button clicks, key macros, window operations, and more.
 
 ## More Details
 
@@ -123,18 +122,18 @@ This application is heavily inspired by [ThumbSense](https://www.sonycsl.co.jp/p
 
 It was created as an alternative because ThumbSense no longer works properly on modern Windows.
 
-Instead of detecting if the touchpad is being touched, YATS uses mouse cursor movement (plus a certain delay after it stops) as a trigger.
+How YATS detects triggers differs by platform.
 
-Therefore, it cannot detect triggers with as much precision as ThumbSense, but it can work with touchpads other than Synaptics/ALPS.
+On Linux, like ThumbSense, YATS detects actual contact with the touchpad. A key press therefore triggers while your finger is touching (and for the Release Delay after you lift it), even when the cursor is perfectly still. Detection goes through the standard evdev interface, so it is vendor-independent: any touchpad that exposes its contact state via evdev works, not just Synaptics/ALPS ones. Contacts are also classified by size for palm rejection.
 
-Since it doesn't even need to be a touchpad, it can also be used in combination with a TrackPoint or [Nape Pro](https://www.gizmodo.jp/2025/11/gizmart-nape-pro.html).
+On Windows, YATS uses mouse cursor movement (plus a certain delay after it stops) as a trigger. Therefore, it cannot detect triggers with as much precision as ThumbSense, but it can work with touchpads other than Synaptics/ALPS. Since it doesn't even need to be a touchpad, it can also be used in combination with a TrackPoint or [Nape Pro](https://www.gizmodo.jp/2025/11/gizmart-nape-pro.html). (On machines with a Precision Touchpad, contact information is also used for palm rejection.)
 
 ## Features
 
 - **Customizable Actions**:
   - Mouse clicks (Left, Right, Middle, Double Click)
   - Keyboard macros
-  - Window operations (Close, Maximize/Restore, Minimize)
+  - Window operations (Close, Maximize/Restore, Minimize, Drag)
   - Scrolling
 - **Scroll Tuning**:
   - Edit the acceleration curve on a graph; changing the output axis range (Min/Max Scroll Output Speed) or the input axis limit (Max Input Speed) rescales the curve while preserving its shape
@@ -213,6 +212,7 @@ chmod +x yats_*.AppImage
 ```
 
 #### Known Limitations (Linux)
+- **Palm Rejection (work in progress)**: Palm rejection on Linux is still being improved. It combines contact-size classification with suppression of key presses right after typing (Palm Delay), but depending on your device and usage, intended actions may occasionally be suppressed, or stray triggers may still slip through while typing.
 - **Wayland Environment**: Window operations (functions using `xdotool`) may not work on Wayland. Remapping and scrolling functions will work.
 - **Permissions**: If access permissions to the device are insufficient, key remapping will not function. Be sure to check the above udev rules or group settings.
 
