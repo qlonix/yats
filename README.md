@@ -14,6 +14,14 @@ Linux では、ThumbSense と同様にタッチパッドへの接触そのもの
 
 Windows では、マウスカーソルが動いているかどうか（+止まってから一定時間の猶予）をトリガーとしています。そのため ThumbSense ほど精度の高いトリガー検出はできませんが、その代わり Synaptics/ALPS 以外のタッチパッドでも動作することができます。タッチパッドである必要すらないので、トラックポイントや [Nape Pro](https://www.gizmodo.jp/2025/11/gizmart-nape-pro.html) と組み合わせての操作も可能です（Precision Touchpad 搭載機種では、接触情報をパームリジェクションにも利用します）。
 
+## プラットフォームによる違い
+
+OS のタッチパッド仕様の違いが、そのまま実装と操作感の違いになっています。
+
+- **パーム判定の材料**: Windows の Precision Touchpad は、接触ごとに Confidence（本物の指かどうかの確信）ビットを付けて報告し、手のひらのような接触は Windows 側でポインタ操作から除外されます。YATS の Windows 版モニタも Confidence ありの接触だけを数えます。一方、Linux の evdev には Confidence 相当の情報がないため、YATS が接触面積の生値やタイピングの状況から自前で判定しています（改善中）。
+- **タップでクリックとの関係**: Windows では Confidence のない接触はタップとしても扱われないため、「タップでクリック」を有効にしていてもタイピング中の誤タップはほとんど起きません。Linux では、置いた手のひらの動きを libinput がタップと判定してしまうことがあり、タイピング中にキャレットが飛ぶなどの誤動作の原因になります。YATS の利用時は、OS 側の「タップでクリック」を無効にするか、「入力中はタッチパッドを無効にする」（dwt）の併用を推奨します。
+- **操作感**: Linux では「触れている間」が条件なので、カーソルが静止していても指を置いたままキー操作ができます。Windows では「動かした直後」が条件なので、完全に止まった状態からの押下は発火しませんが、その代わりタッチパッド以外のポインティングデバイスでも同じ操作ができます。
+
 ## 機能
 
 - **カスタマイズ可能なアクション**:
@@ -127,6 +135,14 @@ How YATS detects triggers differs by platform.
 On Linux, like ThumbSense, YATS detects actual contact with the touchpad. A key press therefore triggers while your finger is touching (and for the Release Delay after you lift it), even when the cursor is perfectly still. Detection goes through the standard evdev interface, so it is vendor-independent: any touchpad that exposes its contact state via evdev works, not just Synaptics/ALPS ones. Contacts are also classified by size for palm rejection.
 
 On Windows, YATS uses mouse cursor movement (plus a certain delay after it stops) as a trigger. Therefore, it cannot detect triggers with as much precision as ThumbSense, but it can work with touchpads other than Synaptics/ALPS. Since it doesn't even need to be a touchpad, it can also be used in combination with a TrackPoint or [Nape Pro](https://www.gizmodo.jp/2025/11/gizmart-nape-pro.html). (On machines with a Precision Touchpad, contact information is also used for palm rejection.)
+
+## Platform Differences
+
+Differences in the OS touchpad stacks translate directly into differences in implementation and feel.
+
+- **Basis for palm rejection**: A Windows Precision Touchpad reports each contact with a Confidence bit (whether it is a real finger); palm-like contacts are excluded from pointer operation by Windows itself, and YATS's Windows monitor likewise counts only contacts with Confidence set. Linux evdev has no equivalent of Confidence, so YATS classifies contacts itself from raw contact size and typing context (still being improved).
+- **Interaction with tap-to-click**: On Windows, a contact without Confidence is never treated as a tap, so tap-to-click can stay enabled with almost no stray taps while typing. On Linux, a resting palm that shifts can be classified as a tap by libinput, which moves the text caret mid-typing and garbles input. When using YATS, we recommend disabling OS tap-to-click, or combining it with "disable while typing" (dwt).
+- **Feel**: On Linux the condition is "while touching", so you can operate with the cursor perfectly still, finger resting on the pad. On Windows the condition is "right after moving", so a press from a complete standstill does not trigger — but the same operation works with any pointing device, not just touchpads.
 
 ## Features
 
