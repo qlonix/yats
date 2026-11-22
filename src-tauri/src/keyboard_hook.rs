@@ -27,62 +27,111 @@ pub struct KeyboardHook {
 }
 
 /// タイピングモード（パームリジェクション）の状態。
-/// 接触しながら一定時間タイプし続けたらモードに入り、その接触が終わるまで
-/// トリガーキーも通常のキーとして通す。「考える間」で打鍵が数秒空いても
-/// Palm Delay のような時間切れで抜けないことが目的で、解除条件は
-/// 「その接触が終わること」だけ（本人が手を離す動作で制御できる）。
+/// 接触しながら一定時間タイプし続けたらモードに入り、その間はトリガー
+/// キーも通常のキーとして通す。「考える間」で打鍵が数秒空いても Palm
+/// Delay のような時間切れで抜けないことが目的。
+/// 実機のタイピングでは置いた手の接触が細かく切れたり再開したりする
+/// （フリッカー）ため、数える打鍵は「接触中の打鍵」だけとしつつ、接触が
+/// ない打鍵では数え直しにしない。解除は次のいずれか:
+/// - カーソルを大きく動かしてから押した（狙った操作とみなす）
+/// - 接触が終わり、かつ直近に数えた打鍵から間が空いた
+/// - 10 秒間打鍵がない（固着防止の上限）
 /// 短いコマンド入力では入らないよう、突入条件は「間隔 1.5 秒以内の打鍵が
 /// 8 回以上、かつエピソード開始から 3 秒以上」としている。
 struct TypingMode {
-    /// モード突入の契機になった接触の開始時刻。モード中はこの接触が
-    /// 続いている間だけ有効で、別の接触に変わったら解除する。
-    active_contact: Option<std::time::Instant>,
+    active: bool,
+    /// モード突入時の接触の開始時刻。
+    bound_contact: Option<std::time::Instant>,
     episode_start: Option<std::time::Instant>,
-    episode_last: Option<std::time::Instant>,
+    /// 最後に「数えた」（接触中の）打鍵の時刻。
+    episode_last_counted: Option<std::time::Instant>,
     episode_presses: usize,
+    /// 種別を問わない最後の打鍵の時刻（10 秒の上限判定用）。
+    last_press: Option<std::time::Instant>,
 }
+
+/// これ以上カーソルが動いていたら「狙った操作」とみなす移動量。
+const TYPING_MODE_MOVE_THRESHOLD: i32 = 200;
 
 impl TypingMode {
     fn new() -> Self {
         Self {
-            active_contact: None,
+            active: false,
+            bound_contact: None,
             episode_start: None,
-            episode_last: None,
+            episode_last_counted: None,
             episode_presses: 0,
+            last_press: None,
         }
     }
 
     fn reset_episode(&mut self) {
         self.episode_start = None;
-        self.episode_last = None;
+        self.episode_last_counted = None;
         self.episode_presses = 0;
     }
 
+    fn deactivate(&mut self, reason: &str) {
+        self.active = false;
+        self.bound_contact = None;
+        self.reset_episode();
+        crate::audit_log(&format!("[PALM] typing mode off ({reason})"));
+    }
+
     /// キー押下のたびに呼び、タイピングモード中なら true を返す。
-    /// `contact` は現在の接触の開始時刻（接触がなければ None）。
+    /// `contact` は現在の接触の開始時刻（接触がなければ None）、
+    /// `movement` は前回の打鍵以降のカーソル移動量。
     fn on_press(
         &mut self,
         now: std::time::Instant,
         contact: Option<std::time::Instant>,
+        movement: i32,
     ) -> bool {
-        if let Some(start) = self.active_contact {
-            if contact == Some(start) {
-                return true;
+        // 前回「数えた」打鍵の時刻（この打鍵で上書きする前に控える）
+        let prev_counted = self.episode_last_counted;
+
+        if self.active {
+            let timed_out = self
+                .last_press
+                .is_some_and(|t| now.duration_since(t).as_millis() > 10_000);
+            if timed_out {
+                self.deactivate("timeout");
+            } else if movement >= TYPING_MODE_MOVE_THRESHOLD {
+                self.deactivate(&format!("cursor moved {movement}"));
+            } else if contact != self.bound_contact {
+                // 接触が終わった／別の接触に変わった。ただし数えた打鍵が
+                // 直近なら、フリッカーの最中とみなして継続する
+                let composing = prev_counted
+                    .is_some_and(|t| now.duration_since(t).as_millis() <= 1500);
+                if composing {
+                    if contact.is_some() {
+                        self.bound_contact = contact;
+                    }
+                } else {
+                    self.deactivate("contact ended");
+                }
             }
-            // 接触が終わった（または別の接触に変わった）ので解除する
-            self.active_contact = None;
-            self.reset_episode();
-            crate::audit_log("[PALM] typing mode off (contact ended)");
+        }
+
+        self.last_press = Some(now);
+        if contact.is_some() {
+            self.episode_last_counted = Some(now);
+        }
+        if self.active {
+            return true;
         }
 
         // 突入判定は「接触しながらの打鍵」だけを数える（接触なしの
-        // タイピングの直後に触れて押した、という正当な操作を巻き込まない）
-        let Some(contact_start) = contact else {
-            self.reset_episode();
+        // タイピングの直後に触れて押した、という正当な操作を巻き込まない）。
+        // 接触がない打鍵では数え直しにしない（フリッカー対策）。
+        if contact.is_none() {
             return false;
-        };
-        match self.episode_last {
-            Some(last) if now.duration_since(last).as_millis() <= 1500 => {
+        }
+        match prev_counted {
+            Some(last)
+                if self.episode_presses > 0
+                    && now.duration_since(last).as_millis() <= 1500 =>
+            {
                 self.episode_presses += 1;
             }
             _ => {
@@ -90,12 +139,12 @@ impl TypingMode {
                 self.episode_presses = 1;
             }
         }
-        self.episode_last = Some(now);
 
         if self.episode_presses >= 8 {
             if let Some(start) = self.episode_start {
                 if now.duration_since(start).as_millis() >= 3000 {
-                    self.active_contact = Some(contact_start);
+                    self.active = true;
+                    self.bound_contact = contact;
                     self.reset_episode();
                     crate::audit_log("[PALM] typing mode on");
                     return true;
@@ -398,8 +447,11 @@ impl KeyboardHook {
                             let palm_reason = {
                                 let cfg = read_unpoison(&config_inner);
                                 if cfg.palm_rejection
-                                    && lock_unpoison(&typing_mode_inner)
-                                        .on_press(now, monitor_inner.contact_started_at())
+                                    && lock_unpoison(&typing_mode_inner).on_press(
+                                        now,
+                                        monitor_inner.contact_started_at(),
+                                        monitor_inner.take_movement(),
+                                    )
                                 {
                                     Some("typing mode")
                                 } else {
@@ -638,6 +690,8 @@ impl KeyboardHook {
                                                                 now,
                                                                 monitor_inner
                                                                     .contact_started_at(),
+                                                                monitor_inner
+                                                                    .take_movement(),
                                                             )
                                                     {
                                                         Some("typing mode")

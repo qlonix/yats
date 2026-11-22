@@ -171,6 +171,15 @@ impl TouchpadMonitor {
         *lock_unpoison(&self.state.contact_start_time)
     }
 
+    /// 前回の呼び出し以降に蓄積したカーソル移動量（|x| + |y|）を取り出す。
+    /// 「狙ってスライドしてから押した」意図的な操作と、タイピングの
+    /// 続きの打鍵とを区別するために使う。
+    pub fn take_movement(&self) -> i32 {
+        let x = self.state.x_delta.swap(0, Ordering::SeqCst);
+        let y = self.state.y_delta.swap(0, Ordering::SeqCst);
+        x.abs() + y.abs()
+    }
+
     pub fn consume_y_delta(&self) -> i32 {
         self.state.y_delta.swap(0, Ordering::SeqCst)
     }
