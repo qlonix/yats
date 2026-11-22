@@ -183,6 +183,9 @@ static SCROLL_DEVICE_FAILED: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 /// フォールバック（クリック送信）用に持ち越す 1/120 ノッチ単位の端数。
 static SCROLL_FALLBACK_REM: Mutex<i32> = Mutex::new(0);
+/// 高解像度ホイールの累計。1 ノッチ（120）を超えるたびに、離散イベント
+/// （REL_WHEEL）も併せて送るために使う。
+static SCROLL_HIRES_ACC: Mutex<i32> = Mutex::new(0);
 
 fn create_scroll_device() -> Option<evdev::uinput::VirtualDevice> {
     let mut keys = evdev::AttributeSet::<evdev::Key>::default();
@@ -230,18 +233,35 @@ fn send_scroll_hires(delta: i32) -> bool {
     let Some(dev) = guard.as_mut() else {
         return false;
     };
-    let events = [
-        evdev::InputEvent::new(
+    // 滑らかなスクロールしか見ないアプリ（ブラウザ等）には HI_RES が
+    // 届くが、離散ステップしか見ないアプリには何も届かない。実機の
+    // 高解像度ホイールと同じく、累計が 1 ノッチを超えたら REL_WHEEL
+    // （離散）も同じフレームで併せて送る。
+    let detents = {
+        let mut acc = crate::lock_unpoison(&SCROLL_HIRES_ACC);
+        *acc += delta;
+        let detents = *acc / 120;
+        *acc -= detents * 120;
+        detents
+    };
+    let mut events = Vec::with_capacity(3);
+    if detents != 0 {
+        events.push(evdev::InputEvent::new(
             evdev::EventType::RELATIVE,
-            evdev::RelativeAxisType::REL_WHEEL_HI_RES.0,
-            delta,
-        ),
-        evdev::InputEvent::new(
-            evdev::EventType::SYNCHRONIZATION,
-            evdev::Synchronization::SYN_REPORT.0,
-            0,
-        ),
-    ];
+            evdev::RelativeAxisType::REL_WHEEL.0,
+            detents,
+        ));
+    }
+    events.push(evdev::InputEvent::new(
+        evdev::EventType::RELATIVE,
+        evdev::RelativeAxisType::REL_WHEEL_HI_RES.0,
+        delta,
+    ));
+    events.push(evdev::InputEvent::new(
+        evdev::EventType::SYNCHRONIZATION,
+        evdev::Synchronization::SYN_REPORT.0,
+        0,
+    ));
     dev.emit(&events).is_ok()
 }
 
