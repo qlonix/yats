@@ -23,8 +23,6 @@ pub struct KeyboardHook {
     config: Arc<RwLock<AppConfig>>,
     tx: Sender<RemapCommand>,
     last_typing_time: Arc<Mutex<Option<std::time::Instant>>>,
-    /// 直近のキー押下履歴（タイピングのバースト検出用、Linux のみ使用）。
-    keystroke_history: Arc<Mutex<std::collections::VecDeque<std::time::Instant>>>,
 }
 
 #[derive(Clone, Debug)]
@@ -280,7 +278,6 @@ impl KeyboardHook {
             config,
             tx,
             last_typing_time: Arc::new(Mutex::new(None)),
-            keystroke_history: Arc::new(Mutex::new(std::collections::VecDeque::new())),
         }
     }
 
@@ -317,9 +314,6 @@ impl KeyboardHook {
                             let palm_reason = palm_rejection_reason(
                                 &read_unpoison(&config_inner),
                                 *lock_unpoison(&last_typing_inner),
-                                monitor_inner.contact_started_at(),
-                                None,
-                                None,
                                 now,
                             );
                             let is_palm_rejected = palm_reason.is_some();
@@ -416,7 +410,6 @@ impl KeyboardHook {
             let monitor_ref = Arc::clone(&self.monitor);
 
             let last_typing_ref = Arc::clone(&self.last_typing_time);
-            let keystroke_history_ref = Arc::clone(&self.keystroke_history);
 
             loop {
                 // Find all keyboards
@@ -517,7 +510,6 @@ impl KeyboardHook {
                     let config_inner = Arc::clone(&config_ref);
                     let monitor_inner = Arc::clone(&monitor_ref);
                     let last_typing_inner = Arc::clone(&last_typing_ref);
-                    let keystroke_history_inner = Arc::clone(&keystroke_history_ref);
                     let v_dev = Arc::clone(&virtual_device);
 
                     threads.push(std::thread::spawn(move || {
@@ -539,39 +531,9 @@ impl KeyboardHook {
                                             1 => {
                                                 // Press
                                                 let now = std::time::Instant::now();
-                                                let keystroke_burst = {
-                                                    let mut history = lock_unpoison(
-                                                        &keystroke_history_inner,
-                                                    );
-                                                    history.push_back(now);
-                                                    while let Some(&front) = history.front() {
-                                                        if now.duration_since(front).as_millis()
-                                                            > 5000
-                                                        {
-                                                            history.pop_front();
-                                                        } else {
-                                                            break;
-                                                        }
-                                                    }
-                                                    history.len()
-                                                };
-                                                let gap_movement =
-                                                    (*lock_unpoison(&last_typing_inner)).map(|lt| {
-                                                        let to = now
-                                                            .checked_sub(
-                                                                std::time::Duration::from_millis(
-                                                                    150,
-                                                                ),
-                                                            )
-                                                            .unwrap_or(lt);
-                                                        monitor_inner.movement_between(lt, to)
-                                                    });
                                                 let palm_reason = palm_rejection_reason(
                                                     &read_unpoison(&config_inner),
                                                     *lock_unpoison(&last_typing_inner),
-                                                    monitor_inner.contact_started_at(),
-                                                    gap_movement,
-                                                    Some(keystroke_burst),
                                                     now,
                                                 );
                                                 let is_palm_rejected = palm_reason.is_some();
@@ -599,11 +561,7 @@ impl KeyboardHook {
                                                     };
                                                     if let Some(action) = action {
                                                         crate::audit_log(&format!(
-                                                            "[TRIGGER] key={rkey:?} fired (gap={})",
-                                                            gap_movement.map_or_else(
-                                                                || "-".to_string(),
-                                                                |v| v.to_string()
-                                                            )
+                                                            "[TRIGGER] key={rkey:?} fired"
                                                         ));
                                                         pressed_keys.insert(rkey, action.clone());
                                                         match action {
@@ -637,11 +595,7 @@ impl KeyboardHook {
                                                     {
                                                         if let Some(reason) = palm_reason {
                                                             crate::audit_log(&format!(
-                                                                "[PALM] key={rkey:?} rejected ({reason}) (gap={})",
-                                                                gap_movement.map_or_else(
-                                                                    || "-".to_string(),
-                                                                    |v| v.to_string()
-                                                                )
+                                                                "[PALM] key={rkey:?} rejected ({reason})"
                                                             ));
                                                         }
                                                     }
@@ -709,15 +663,14 @@ impl KeyboardHook {
 }
 
 /// パームリジェクションで抑止する場合はその理由を返す（抑止しない場合は None）。
-/// 理由は監査ログで「直前のタイピングによる抑止 (recent typing)」と
-/// 「接触の方がタイピングより先だったための抑止 (stale contact)」を
-/// 区別するために使う。
+/// ここでは「直前のタイピングによる抑止 (recent typing)」だけを行う。
+/// 以前あった stale contact / typing contact のルールは、「打鍵の直後に
+/// そのまま操作する」正当な操作まで広く食べてしまうため廃止した
+/// （2026-11-22 の実機フィードバック）。大きな接触の抑止はモニタ側の
+/// サイズ判定が担う。
 fn palm_rejection_reason(
     cfg: &AppConfig,
     last_typing: Option<std::time::Instant>,
-    contact_started_at: Option<std::time::Instant>,
-    gap_movement: Option<i32>,
-    keystroke_burst: Option<usize>,
     now: std::time::Instant,
 ) -> Option<&'static str> {
     if !cfg.palm_rejection {
@@ -726,21 +679,6 @@ fn palm_rejection_reason(
     let last_time = last_typing?;
     if now.duration_since(last_time).as_millis() < cfg.palm_rejection_delay_ms as u128 {
         return Some("recent typing");
-    }
-    // タイピング中の誤爆は、打鍵の流れの最中に起きる。直近 5 秒に
-    // 打鍵が続いている（バースト）状態で、最後のキー入力から押下
-    // までの間のカーソル移動が小さい場合は誤爆とみなす。実測では
-    // 誤爆時の移動量は最大でも 1700 程度、意図した操作はほぼ
-    // 3000 以上で、2000 を境界にした。バースト中でなければ（打ち
-    // 終わってからの操作なら）このルールは働かない。
-    // 移動量と打鍵履歴を数えるのは Linux のみ（他は None で無効）。
-    if let (Some(burst), Some(movement)) = (keystroke_burst, gap_movement) {
-        if burst >= 4 && movement < 2000 {
-            return Some("typing contact");
-        }
-    }
-    if contact_started_at.is_some_and(|started_at| started_at < last_time) {
-        return Some("stale contact");
     }
     None
 }

@@ -233,10 +233,10 @@ fn send_scroll_hires(delta: i32) -> bool {
     let Some(dev) = guard.as_mut() else {
         return false;
     };
-    // 滑らかなスクロールしか見ないアプリ（ブラウザ等）には HI_RES が
-    // 届くが、離散ステップしか見ないアプリには何も届かない。実機の
-    // 高解像度ホイールと同じく、累計が 1 ノッチを超えたら REL_WHEEL
-    // （離散）も同じフレームで併せて送る。
+    // 1 ノッチ（120）に満たない量は送らずに貯める。GTK 系アプリは
+    // ノッチ未満の valuator 変化を切り捨ててしまうため、細かい刻みで
+    // 送ると一切スクロールしない（ブラウザは自分で蓄積するので効く）。
+    // 完成したノッチ分だけを REL_WHEEL（離散）と HI_RES の両方で送る。
     let detents = {
         let mut acc = crate::lock_unpoison(&SCROLL_HIRES_ACC);
         *acc += delta;
@@ -244,24 +244,26 @@ fn send_scroll_hires(delta: i32) -> bool {
         *acc -= detents * 120;
         detents
     };
-    let mut events = Vec::with_capacity(3);
-    if detents != 0 {
-        events.push(evdev::InputEvent::new(
+    if detents == 0 {
+        return true;
+    }
+    let events = [
+        evdev::InputEvent::new(
             evdev::EventType::RELATIVE,
             evdev::RelativeAxisType::REL_WHEEL.0,
             detents,
-        ));
-    }
-    events.push(evdev::InputEvent::new(
-        evdev::EventType::RELATIVE,
-        evdev::RelativeAxisType::REL_WHEEL_HI_RES.0,
-        delta,
-    ));
-    events.push(evdev::InputEvent::new(
-        evdev::EventType::SYNCHRONIZATION,
-        evdev::Synchronization::SYN_REPORT.0,
-        0,
-    ));
+        ),
+        evdev::InputEvent::new(
+            evdev::EventType::RELATIVE,
+            evdev::RelativeAxisType::REL_WHEEL_HI_RES.0,
+            detents * 120,
+        ),
+        evdev::InputEvent::new(
+            evdev::EventType::SYNCHRONIZATION,
+            evdev::Synchronization::SYN_REPORT.0,
+            0,
+        ),
+    ];
     dev.emit(&events).is_ok()
 }
 
