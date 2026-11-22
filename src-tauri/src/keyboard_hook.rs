@@ -99,9 +99,12 @@ impl TypingMode {
             } else if movement >= TYPING_MODE_MOVE_THRESHOLD {
                 self.deactivate(&format!("cursor moved {movement}"));
             } else if contact != self.bound_contact {
-                // 接触が終わった／別の接触に変わった。ただし数えた打鍵が
-                // 直近なら、フリッカーの最中とみなして継続する
-                let composing = prev_counted
+                // 接触が終わった／別の接触に変わった。ただし最後の打鍵が
+                // 直近なら入力の最中とみなして継続する（接触側の開始時刻は
+                // タイピング中の手の動きで頻繁に入れ替わるため、それ自体を
+                // 解除の根拠にすると入った直後に解除されてしまう）
+                let composing = self
+                    .last_press
                     .is_some_and(|t| now.duration_since(t).as_millis() <= 1500);
                 if composing {
                     if contact.is_some() {
