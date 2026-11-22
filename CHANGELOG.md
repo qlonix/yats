@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**日本語**
+
+### Fixed
+- パームリジェクションに「タイピングモード」を追加。タッチパッドに触れながら一定時間タイプし続けると（間隔 1.5 秒以内の打鍵が 8 回以上、かつ 3 秒以上継続）、その接触が終わるまでトリガーキーも通常のキーとして通すようになった。長文入力中の「考える間」で打鍵が数秒空いても、Palm Delay の時間切れで誤発火しなくなった。解除は接触の終了（手を離すこと）でのみ行われ、短いコマンド入力ではモードに入らない
+
+**English**
+
+### Fixed
+- Added a "typing mode" to palm rejection. When you keep typing while touching the touchpad (8+ keystrokes no more than 1.5 s apart, sustained for at least 3 s), trigger keys are passed through as regular keys until that contact ends. Stray triggers no longer slip through thinking pauses of several seconds, which the time-based Palm Delay could not cover. The mode ends only when the contact ends (lifting your hand), and short command input does not enter it
+
 ## [1.4.0] - 2026-11-22
 
 **日本語**

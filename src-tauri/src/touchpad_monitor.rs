@@ -165,6 +165,12 @@ impl TouchpadMonitor {
         self.state.is_touched.load(Ordering::SeqCst)
     }
 
+    /// 現在の接触が始まった時刻。接触がなければ None。
+    /// 接触ごとに異なる値になるため、「同じ接触が続いているか」の判定にも使える。
+    pub fn contact_started_at(&self) -> Option<std::time::Instant> {
+        *lock_unpoison(&self.state.contact_start_time)
+    }
+
     pub fn consume_y_delta(&self) -> i32 {
         self.state.y_delta.swap(0, Ordering::SeqCst)
     }

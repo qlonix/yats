@@ -23,6 +23,87 @@ pub struct KeyboardHook {
     config: Arc<RwLock<AppConfig>>,
     tx: Sender<RemapCommand>,
     last_typing_time: Arc<Mutex<Option<std::time::Instant>>>,
+    typing_mode: Arc<Mutex<TypingMode>>,
+}
+
+/// タイピングモード（パームリジェクション）の状態。
+/// 接触しながら一定時間タイプし続けたらモードに入り、その接触が終わるまで
+/// トリガーキーも通常のキーとして通す。「考える間」で打鍵が数秒空いても
+/// Palm Delay のような時間切れで抜けないことが目的で、解除条件は
+/// 「その接触が終わること」だけ（本人が手を離す動作で制御できる）。
+/// 短いコマンド入力では入らないよう、突入条件は「間隔 1.5 秒以内の打鍵が
+/// 8 回以上、かつエピソード開始から 3 秒以上」としている。
+struct TypingMode {
+    /// モード突入の契機になった接触の開始時刻。モード中はこの接触が
+    /// 続いている間だけ有効で、別の接触に変わったら解除する。
+    active_contact: Option<std::time::Instant>,
+    episode_start: Option<std::time::Instant>,
+    episode_last: Option<std::time::Instant>,
+    episode_presses: usize,
+}
+
+impl TypingMode {
+    fn new() -> Self {
+        Self {
+            active_contact: None,
+            episode_start: None,
+            episode_last: None,
+            episode_presses: 0,
+        }
+    }
+
+    fn reset_episode(&mut self) {
+        self.episode_start = None;
+        self.episode_last = None;
+        self.episode_presses = 0;
+    }
+
+    /// キー押下のたびに呼び、タイピングモード中なら true を返す。
+    /// `contact` は現在の接触の開始時刻（接触がなければ None）。
+    fn on_press(
+        &mut self,
+        now: std::time::Instant,
+        contact: Option<std::time::Instant>,
+    ) -> bool {
+        if let Some(start) = self.active_contact {
+            if contact == Some(start) {
+                return true;
+            }
+            // 接触が終わった（または別の接触に変わった）ので解除する
+            self.active_contact = None;
+            self.reset_episode();
+            crate::audit_log("[PALM] typing mode off (contact ended)");
+        }
+
+        // 突入判定は「接触しながらの打鍵」だけを数える（接触なしの
+        // タイピングの直後に触れて押した、という正当な操作を巻き込まない）
+        let Some(contact_start) = contact else {
+            self.reset_episode();
+            return false;
+        };
+        match self.episode_last {
+            Some(last) if now.duration_since(last).as_millis() <= 1500 => {
+                self.episode_presses += 1;
+            }
+            _ => {
+                self.episode_start = Some(now);
+                self.episode_presses = 1;
+            }
+        }
+        self.episode_last = Some(now);
+
+        if self.episode_presses >= 8 {
+            if let Some(start) = self.episode_start {
+                if now.duration_since(start).as_millis() >= 3000 {
+                    self.active_contact = Some(contact_start);
+                    self.reset_episode();
+                    crate::audit_log("[PALM] typing mode on");
+                    return true;
+                }
+            }
+        }
+        false
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -278,6 +359,7 @@ impl KeyboardHook {
             config,
             tx,
             last_typing_time: Arc::new(Mutex::new(None)),
+            typing_mode: Arc::new(Mutex::new(TypingMode::new())),
         }
     }
 
@@ -289,12 +371,14 @@ impl KeyboardHook {
             let config_ref = Arc::clone(&self.config);
             let monitor_ref = Arc::clone(&self.monitor);
             let last_typing_ref = Arc::clone(&self.last_typing_time);
+            let typing_mode_ref = Arc::clone(&self.typing_mode);
 
             loop {
                 let tx_inner = tx.clone();
                 let config_inner = Arc::clone(&config_ref);
                 let monitor_inner = Arc::clone(&monitor_ref);
                 let last_typing_inner = Arc::clone(&last_typing_ref);
+                let typing_mode_inner = Arc::clone(&typing_mode_ref);
                 let pressed_keys = Arc::new(Mutex::new(std::collections::HashSet::new()));
 
                 crate::audit_log("[HOOK] Calling rdev::grab...");
@@ -311,11 +395,21 @@ impl KeyboardHook {
                             }
 
                             let now = std::time::Instant::now();
-                            let palm_reason = palm_rejection_reason(
-                                &read_unpoison(&config_inner),
-                                *lock_unpoison(&last_typing_inner),
-                                now,
-                            );
+                            let palm_reason = {
+                                let cfg = read_unpoison(&config_inner);
+                                if cfg.palm_rejection
+                                    && lock_unpoison(&typing_mode_inner)
+                                        .on_press(now, monitor_inner.contact_started_at())
+                                {
+                                    Some("typing mode")
+                                } else {
+                                    palm_rejection_reason(
+                                        &cfg,
+                                        *lock_unpoison(&last_typing_inner),
+                                        now,
+                                    )
+                                }
+                            };
                             let is_palm_rejected = palm_reason.is_some();
 
                             let touched = monitor_inner.is_touched();
@@ -327,6 +421,9 @@ impl KeyboardHook {
                             let should_trigger = action.is_some() && touched && !is_palm_rejected;
 
                             if should_trigger {
+                                // 意図した操作が発火したら、タイピングの
+                                // エピソードはそこで終わったものとする
+                                lock_unpoison(&typing_mode_inner).reset_episode();
                                 keys.insert(key);
                                 if let Some(action) = action {
                                     crate::audit_log(&format!("[TRIGGER] key={key:?} fired"));
@@ -410,6 +507,7 @@ impl KeyboardHook {
             let monitor_ref = Arc::clone(&self.monitor);
 
             let last_typing_ref = Arc::clone(&self.last_typing_time);
+            let typing_mode_ref = Arc::clone(&self.typing_mode);
 
             loop {
                 // Find all keyboards
@@ -510,6 +608,7 @@ impl KeyboardHook {
                     let config_inner = Arc::clone(&config_ref);
                     let monitor_inner = Arc::clone(&monitor_ref);
                     let last_typing_inner = Arc::clone(&last_typing_ref);
+                    let typing_mode_inner = Arc::clone(&typing_mode_ref);
                     let v_dev = Arc::clone(&virtual_device);
 
                     threads.push(std::thread::spawn(move || {
@@ -531,11 +630,27 @@ impl KeyboardHook {
                                             1 => {
                                                 // Press
                                                 let now = std::time::Instant::now();
-                                                let palm_reason = palm_rejection_reason(
-                                                    &read_unpoison(&config_inner),
-                                                    *lock_unpoison(&last_typing_inner),
-                                                    now,
-                                                );
+                                                let palm_reason = {
+                                                    let cfg = read_unpoison(&config_inner);
+                                                    if cfg.palm_rejection
+                                                        && lock_unpoison(&typing_mode_inner)
+                                                            .on_press(
+                                                                now,
+                                                                monitor_inner
+                                                                    .contact_started_at(),
+                                                            )
+                                                    {
+                                                        Some("typing mode")
+                                                    } else {
+                                                        palm_rejection_reason(
+                                                            &cfg,
+                                                            *lock_unpoison(
+                                                                &last_typing_inner,
+                                                            ),
+                                                            now,
+                                                        )
+                                                    }
+                                                };
                                                 let is_palm_rejected = palm_reason.is_some();
 
                                                 let is_remap = {
@@ -555,6 +670,10 @@ impl KeyboardHook {
                                                     && !is_palm_rejected;
 
                                                 if should_trigger {
+                                                    // 意図した操作が発火したら、タイピングの
+                                                    // エピソードはそこで終わったものとする
+                                                    lock_unpoison(&typing_mode_inner)
+                                                        .reset_episode();
                                                     let action = {
                                                         let cfg = read_unpoison(&config_inner);
                                                         cfg.mappings.get(&rkey).cloned()
