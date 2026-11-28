@@ -8,13 +8,11 @@
 
 最近の Windows では ThumbSense がまともに動作しなくなってしまったため、代替案として作成しました。
 
-YATS のトリガー検出は、プラットフォームで方式が異なります。
+YATS のトリガー検出には「接触検出」と「移動検出」の2方式があり、Windows / Linux のどちらでも両方を使えます。設定の「Trigger Detection」で切り替えます（「Auto (Both)」は両方の併用）。既定は Linux が接触検出、Windows が移動検出です。Windows で接触検出を使うには Precision Touchpad が必要です。
 
-Linux では、ThumbSense と同様にタッチパッドへの接触そのものを検出します。そのため、カーソルが止まっていても、指が触れている間（および指を離してから Release Delay の間）のキー押下でトリガーが発火します。検出は標準の evdev インターフェース経由なのでベンダーに依存せず、接触状態を evdev で取得できるタッチパッドであれば、Synaptics / ALPS 製でなくても動作します。パームリジェクションとして、接触面積による手のひら判定も行います。
+Linux の接触検出は、ThumbSense と同様にタッチパッドへの接触そのものを検出します。そのため、カーソルが止まっていても、指が触れている間（および指を離してから Release Delay の間）のキー押下でトリガーが発火します。検出は標準の evdev インターフェース経由なのでベンダーに依存せず、接触状態を evdev で取得できるタッチパッドであれば、Synaptics / ALPS 製でなくても動作します。パームリジェクションとして、接触面積による手のひら判定も行います。
 
-なお、設定の「Trigger Detection」で検出方式を切り替えられます（Windows / Linux 共通）。「Movement (Any Device)」にすると、カーソルが動いてから Release Delay 以内のキー押下をトリガーとする方式になり、マウスやトラックポイントなどタッチパッド以外のポインティングデバイスでも使えます。「Auto (Both)」は接触検出と移動検出の併用です。Windows で「Contact」を使うには Precision Touchpad が必要です（既定は従来どおり移動検出）。
-
-Windows では、マウスカーソルが動いているかどうか（+止まってから一定時間の猶予）をトリガーとしています。そのため ThumbSense ほど精度の高いトリガー検出はできませんが、その代わり Synaptics/ALPS 以外のタッチパッドでも動作することができます。タッチパッドである必要すらないので、トラックポイントや [Nape Pro](https://www.gizmodo.jp/2025/11/gizmart-nape-pro.html) と組み合わせての操作も可能です（Precision Touchpad 搭載機種では、接触情報をパームリジェクションにも利用します）。
+Windows の移動検出は、マウスカーソルが動いているかどうか（+止まってから一定時間の猶予）をトリガーとします。精度では接触検出に及びませんが、その代わり Synaptics/ALPS 以外のタッチパッドでも動作することができます。タッチパッドである必要すらないので、トラックポイントや [Nape Pro](https://www.gizmodo.jp/2025/11/gizmart-nape-pro.html) と組み合わせての操作も可能です。Precision Touchpad 搭載機種では接触検出も選べ、接触情報はパームリジェクションにも利用します。
 
 ## プラットフォームによる違い
 
@@ -22,7 +20,7 @@ OS のタッチパッド仕様の違いが、そのまま実装と操作感の�
 
 - **パーム判定の材料**: Windows の Precision Touchpad は、接触ごとに Confidence（本物の指かどうかの確信）ビットを付けて報告し、手のひらのような接触は Windows 側でポインタ操作から除外されます。YATS の Windows 版モニタも Confidence ありの接触だけを数えます。一方、Linux の evdev には Confidence 相当の情報がないため、YATS が接触面積の生値やタイピングの状況から自前で判定しています（改善中）。
 - **タップでクリックとの関係**: Windows では Confidence のない接触はタップとしても扱われないため、「タップでクリック」を有効にしていてもタイピング中の誤タップはほとんど起きません。Linux では、置いた手のひらの動きを libinput がタップと判定してしまうことがあり、タイピング中にキャレットが飛ぶなどの誤動作の原因になります。YATS の利用時は、OS 側の「タップでクリック」を無効にするか、「入力中はタッチパッドを無効にする」（dwt）の併用を推奨します。
-- **操作感**: Linux では「触れている間」が条件なので、カーソルが静止していても指を置いたままキー操作ができます。Windows では「動かした直後」が条件なので、完全に止まった状態からの押下は発火しませんが、その代わりタッチパッド以外のポインティングデバイスでも同じ操作ができます。
+- **操作感**: 接触検出では「触れている間」が条件なので、カーソルが静止していても指を置いたままキー操作ができます。移動検出では「動かした直後」が条件なので、完全に止まった状態からの押下は発火しませんが、その代わりタッチパッド以外のポインティングデバイスでも同じ操作ができます。どちらの方式も Windows / Linux の両方で使えます（Windows の接触検出は Precision Touchpad 搭載機種のみ）。
 
 ## 機能
 
@@ -31,6 +29,8 @@ OS のタッチパッド仕様の違いが、そのまま実装と操作感の�
   - キーボードマクロ
   - ウィンドウ操作 (閉じる、最大化/元に戻す、最小化、ドラッグ移動)
   - スクロール
+- **トリガー検出方式 (Trigger Detection)**:
+  - 接触検出 / 移動検出 / 自動（両方）を、Windows / Linux のどちらでも切り替え可能
 - **スクロール調整 (Scroll Tuning)**:
   - 加速度カーブをグラフで編集でき、出力軸 (Min/Max Scroll Output Speed) と入力軸の上限 (Max Input Speed) を変更すると、カーブが形を保ったまま伸縮します
   - 入力速度の上限の初期値は、接続中のモニタ幅から自動決定されます
@@ -132,13 +132,11 @@ This application is heavily inspired by [ThumbSense](https://www.sonycsl.co.jp/p
 
 It was created as an alternative because ThumbSense no longer works properly on modern Windows.
 
-How YATS detects triggers differs by platform.
+YATS has two trigger detection methods — contact detection and movement detection — and both are available on both Windows and Linux. Switch between them in the "Trigger Detection" setting ("Auto (Both)" combines the two). The default is contact detection on Linux and movement detection on Windows. On Windows, contact detection requires a Precision Touchpad.
 
-On Linux, like ThumbSense, YATS detects actual contact with the touchpad. A key press therefore triggers while your finger is touching (and for the Release Delay after you lift it), even when the cursor is perfectly still. Detection goes through the standard evdev interface, so it is vendor-independent: any touchpad that exposes its contact state via evdev works, not just Synaptics/ALPS ones. Contacts are also classified by size for palm rejection.
+On Linux, contact detection, like ThumbSense, detects actual contact with the touchpad. A key press therefore triggers while your finger is touching (and for the Release Delay after you lift it), even when the cursor is perfectly still. Detection goes through the standard evdev interface, so it is vendor-independent: any touchpad that exposes its contact state via evdev works, not just Synaptics/ALPS ones. Contacts are also classified by size for palm rejection.
 
-You can switch the detection method in the "Trigger Detection" setting (on both Windows and Linux). "Movement (Any Device)" uses the method of triggering on a key press within the Release Delay after the cursor moved, which works with any pointing device such as a mouse or a TrackPoint. "Auto (Both)" combines contact and movement detection. On Windows, "Contact" requires a Precision Touchpad (the default remains movement detection, as before).
-
-On Windows, YATS uses mouse cursor movement (plus a certain delay after it stops) as a trigger. Therefore, it cannot detect triggers with as much precision as ThumbSense, but it can work with touchpads other than Synaptics/ALPS. Since it doesn't even need to be a touchpad, it can also be used in combination with a TrackPoint or [Nape Pro](https://www.gizmodo.jp/2025/11/gizmart-nape-pro.html). (On machines with a Precision Touchpad, contact information is also used for palm rejection.)
+On Windows, movement detection uses mouse cursor movement (plus a certain delay after it stops) as a trigger. It cannot match the precision of contact detection, but it can work with touchpads other than Synaptics/ALPS. Since it doesn't even need to be a touchpad, it can also be used in combination with a TrackPoint or [Nape Pro](https://www.gizmodo.jp/2025/11/gizmart-nape-pro.html). On machines with a Precision Touchpad, contact detection is also available, and contact information is used for palm rejection as well.
 
 ## Platform Differences
 
@@ -146,7 +144,7 @@ Differences in the OS touchpad stacks translate directly into differences in imp
 
 - **Basis for palm rejection**: A Windows Precision Touchpad reports each contact with a Confidence bit (whether it is a real finger); palm-like contacts are excluded from pointer operation by Windows itself, and YATS's Windows monitor likewise counts only contacts with Confidence set. Linux evdev has no equivalent of Confidence, so YATS classifies contacts itself from raw contact size and typing context (still being improved).
 - **Interaction with tap-to-click**: On Windows, a contact without Confidence is never treated as a tap, so tap-to-click can stay enabled with almost no stray taps while typing. On Linux, a resting palm that shifts can be classified as a tap by libinput, which moves the text caret mid-typing and garbles input. When using YATS, we recommend disabling OS tap-to-click, or combining it with "disable while typing" (dwt).
-- **Feel**: On Linux the condition is "while touching", so you can operate with the cursor perfectly still, finger resting on the pad. On Windows the condition is "right after moving", so a press from a complete standstill does not trigger — but the same operation works with any pointing device, not just touchpads.
+- **Feel**: With contact detection the condition is "while touching", so you can operate with the cursor perfectly still, finger resting on the pad. With movement detection the condition is "right after moving", so a press from a complete standstill does not trigger — but the same operation works with any pointing device, not just touchpads. Both methods are available on both Windows and Linux (contact detection on Windows requires a Precision Touchpad).
 
 ## Features
 
@@ -155,6 +153,8 @@ Differences in the OS touchpad stacks translate directly into differences in imp
   - Keyboard macros
   - Window operations (Close, Maximize/Restore, Minimize, Drag)
   - Scrolling
+- **Trigger Detection**:
+  - Contact detection / movement detection / Auto (both) can be switched on either Windows or Linux
 - **Scroll Tuning**:
   - Edit the acceleration curve on a graph; changing the output axis range (Min/Max Scroll Output Speed) or the input axis limit (Max Input Speed) rescales the curve while preserving its shape
   - The input speed limit is initially determined automatically from your monitor width
