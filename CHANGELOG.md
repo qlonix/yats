@@ -15,13 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Linux の接触検出で、タッチパッドに触れたまま指を静止させていると接触が切れてしまう問題を修正。静止した指は evdev イベントを出さないため、従来は Release Delay 経過後に接触が期限切れになっていた。接触状態をイベントの新しさではなく接触の有無そのもので判定するようにした
-- Ctrl などの修飾キーを押しながらトリガーキーを押すと、パームリジェクションに「タイピング直後」と誤判定されて発火しない問題を修正。修飾キーの押下・解放はタイピングとして数えないようにしたため、Ctrl+クリック（リンクを新しいタブで開く）や Shift+クリックが使えるようになった
+- Ctrl などの修飾キーを押しながらトリガーキーを押すと、パームリジェクションに「タイピング直後」と誤判定されて発火しない問題を修正。修飾キーとロックキー（Caps Lock / Num Lock / Scroll Lock）の押下・解放はタイピングとして数えないようにしたため、Ctrl+クリック（リンクを新しいタブで開く）や Shift+クリックが使えるようになった。Caps Lock を Ctrl に割り当てている環境（Linux では evdev レベルで Caps Lock として届く）でも有効
 
 **English**
 
 ### Fixed
 - Fixed contact detection on Linux dropping the contact while a finger rests still on the touchpad. A still finger produces no evdev events, so the contact previously expired after the Release Delay. The contact state is now based on contact presence itself rather than event recency
-- Fixed trigger keys being rejected as "recent typing" by palm rejection when pressed while a modifier key (Ctrl, Shift, Alt, Meta) is held. Modifier presses and releases no longer count as typing, so Ctrl+click (open link in new tab) and Shift+click now work
+- Fixed trigger keys being rejected as "recent typing" by palm rejection when pressed while a modifier key (Ctrl, Shift, Alt, Meta) is held. Modifier and lock key (Caps Lock / Num Lock / Scroll Lock) presses and releases no longer count as typing, so Ctrl+click (open link in new tab) and Shift+click now work, including setups where Caps Lock is remapped to Ctrl (on Linux it still arrives as Caps Lock at the evdev level)
 
 ## [1.4.1] - 2026-11-28
 

@@ -854,6 +854,8 @@ impl KeyboardHook {
     }
 }
 
+// ロックキーも文字入力ではない。特に CapsLock は Ctrl に割り当て直されることが多く、
+// タイピング扱いすると Ctrl+クリックが抑止される。
 fn is_modifier_key(key: &Key) -> bool {
     matches!(
         key,
@@ -865,6 +867,9 @@ fn is_modifier_key(key: &Key) -> bool {
             | Key::AltGr
             | Key::MetaLeft
             | Key::MetaRight
+            | Key::CapsLock
+            | Key::NumLock
+            | Key::ScrollLock
     )
 }
 
