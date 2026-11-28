@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **日本語**
 
 ### Added
+- 設定画面のアクション選択肢に「Browser Back」「Browser Forward」を追加。バックエンドには専用アクションとして実装済みだったが、UI からは選べなかった
 - トリガー検出方式を設定から切り替えられるようにした（Trigger Detection、Windows / Linux 共通）。「Contact (Touchpad)」は接触検出、「Movement (Any Device)」はカーソルが動いてから Release Delay 以内のキー押下をトリガーとする方式で、マウスやトラックポイントなどタッチパッド以外のポインティングデバイスでも使える。「Auto (Both)」は両方の併用。Windows の Contact は Precision Touchpad が必要。未設定時の既定は従来どおり（Linux は接触検出、Windows は移動検出）
 
 ### Fixed
@@ -23,9 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **English**
 
 ### Added
+- Added "Browser Back" and "Browser Forward" to the action choices in the settings UI. They were already implemented as dedicated actions in the backend but could not be selected from the UI
 - The trigger detection method can now be switched in the settings (Trigger Detection, on both Windows and Linux). "Contact (Touchpad)" is contact detection; "Movement (Any Device)" triggers on a key press within the Release Delay after the cursor moved, and works with any pointing device such as a mouse or a TrackPoint; "Auto (Both)" combines the two. On Windows, Contact requires a Precision Touchpad. When unset, the default is unchanged (contact detection on Linux, movement detection on Windows)
 
 ### Fixed
+- Fixed scrolling not working with a mouse under movement detection (Movement / Auto) on Linux. Mouse and TrackPoint evdev devices are now monitored directly, supplying movement deltas and movement-detection timestamps at device rate (previously only the X pointer position was polled and no deltas were supplied at all)
 - Added a "typing mode" to palm rejection. When you keep typing while touching the touchpad (8+ keystrokes no more than 1.5 s apart, sustained for at least 3 s), trigger keys are passed through as regular keys. Stray triggers no longer slip through thinking pauses of several seconds, which the time-based Palm Delay could not cover. Brief contact flicker during typing does not end the mode; it ends only when you press after a deliberate cursor move, when the contact ends and typing has stopped, or after 10 s without a keystroke. Short command input does not enter it
 
 ## [1.4.0] - 2026-11-22

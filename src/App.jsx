@@ -675,7 +675,7 @@ function App() {
       if (typeof actionValue !== "string") finalValue = "Left";
     } else if (actionType === "Window") {
       if (typeof actionValue !== "string") finalValue = "Close";
-    } else if (actionType === "WindowDrag") {
+    } else if (actionType === "WindowDrag" || actionType === "BrowserBack" || actionType === "BrowserForward") {
       finalValue = undefined;
     } else if (actionType === "MouseScroll") {
       if (typeof actionValue !== "object" || !actionValue) finalValue = { sensitivity: 100 };
@@ -1003,6 +1003,8 @@ function App() {
                         <option value="KeyMacro">Key Macro</option>
                         <option value="Window">Window Control</option>
                         <option value="WindowDrag">Window Drag</option>
+                        <option value="BrowserBack">Browser Back</option>
+                        <option value="BrowserForward">Browser Forward</option>
                       </select>
                     </td>
                     <td className="config-cell">
