@@ -1,6 +1,6 @@
 [package]
 name = "yats"
-version = "1.4.1"
+version = "1.4.2"
 description = "Yet Another Touchpad Shortcut"
 authors = ["QLO (qlonix)"]
 license = "MIT"
