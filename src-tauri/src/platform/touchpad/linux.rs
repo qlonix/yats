@@ -434,3 +434,106 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
 pub fn scan_and_register(_state: &MonitorState) {
     crate::audit_log("[MONITOR] Device scan requested (Linux)");
 }
+
+/// マウスやトラックポイントなど、タッチパッド以外のポインティング
+/// デバイスを監視する。REL_X/REL_Y のデルタをモニタの x_delta/y_delta
+/// に供給し（スクロール等の移動量になる）、移動検出のタイムスタンプも
+/// デバイスレートで打つ（X ポーリングより遅延がない）。
+/// 接触検出モード（trigger_mode == 0）ではイベントを読み捨てるだけで
+/// 何も供給しない。
+pub fn run_pointer_monitor(state: Arc<MonitorState>) {
+    crate::audit_log("[MONITOR] Starting Linux Pointer Monitor Worker");
+
+    loop {
+        let mut devices = Vec::new();
+        if let Ok(dir) = std::fs::read_dir("/dev/input") {
+            for entry in dir.flatten() {
+                let path = entry.path();
+                if path.to_string_lossy().contains("event") {
+                    if let Ok(device) = Device::open(&path) {
+                        if is_pointer_device(&device) {
+                            crate::audit_log(&format!(
+                                "[MONITOR] Found Pointer Device: '{}' at {:?}",
+                                device.name().unwrap_or("Unknown"),
+                                path
+                            ));
+                            devices.push(device);
+                        }
+                    }
+                }
+            }
+        }
+
+        if devices.is_empty() {
+            std::thread::sleep(std::time::Duration::from_secs(5));
+            continue;
+        }
+
+        let mut threads = Vec::new();
+        for mut device in devices {
+            let s_clone = Arc::clone(&state);
+            threads.push(std::thread::spawn(move || {
+                monitor_pointer_device(&mut device, s_clone);
+            }));
+        }
+
+        for t in threads {
+            let _ = t.join();
+        }
+        crate::audit_log("[MONITOR] Pointer device lost, rescanning...");
+        std::thread::sleep(std::time::Duration::from_secs(2));
+    }
+}
+
+fn is_pointer_device(device: &Device) -> bool {
+    let name = device.name().unwrap_or("").to_lowercase();
+    // 自前の仮想デバイス（YATS Virtual Scroll は REL_X/REL_Y と
+    // ボタンを持つため、名前で確実に除外する）
+    if name.contains("yats") || name.contains("virtual") {
+        return false;
+    }
+    // ABS を持つデバイス（タッチパッド等）は接触検出側で扱う
+    if device.supported_events().contains(EventType::ABSOLUTE) {
+        return false;
+    }
+    let has_rel = device.supported_relative_axes().map_or(false, |axes| {
+        axes.contains(evdev::RelativeAxisType::REL_X)
+            && axes.contains(evdev::RelativeAxisType::REL_Y)
+    });
+    let has_btn_left = device
+        .supported_keys()
+        .map_or(false, |keys| keys.contains(evdev::Key::BTN_LEFT));
+    has_rel && has_btn_left
+}
+
+fn monitor_pointer_device(device: &mut Device, state: Arc<MonitorState>) {
+    loop {
+        let events = match device.fetch_events() {
+            Ok(it) => it.collect::<Vec<_>>(),
+            Err(_) => break,
+        };
+
+        // 接触検出モードでは読み捨てる（モード切替時に古いデルタが
+        // まとめて流れるのを防ぐため、常に読み続ける）
+        if state.trigger_mode.load(Ordering::SeqCst) == 0 {
+            continue;
+        }
+
+        for ev in events {
+            if ev.event_type() == EventType::RELATIVE {
+                match ev.code() {
+                    0 => {
+                        state.x_delta.fetch_add(ev.value(), Ordering::SeqCst);
+                    }
+                    1 => {
+                        state.y_delta.fetch_add(ev.value(), Ordering::SeqCst);
+                    }
+                    _ => continue,
+                }
+                *crate::lock_unpoison(&state.last_movement_time) =
+                    std::time::Instant::now();
+                state.movement_seen.store(true, Ordering::SeqCst);
+            }
+        }
+    }
+}

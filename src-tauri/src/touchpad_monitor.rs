@@ -94,6 +94,23 @@ impl TouchpadMonitor {
                 std::thread::spawn(|| {})
             });
 
+        // マウス等のポインティングデバイス監視（Linux のみ、移動検出用）
+        #[cfg(target_os = "linux")]
+        {
+            let state_pointer = Arc::clone(&state);
+            std::thread::Builder::new()
+                .name("pointer-monitor".to_string())
+                .spawn(move || {
+                    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        touchpad::run_pointer_monitor(state_pointer);
+                    }));
+                    if result.is_err() {
+                        audit_log("[MONITOR] PANIC in pointer monitor thread");
+                    }
+                })
+                .ok();
+        }
+
         let state_watch = Arc::clone(&state);
         std::thread::Builder::new()
             .name("monitor-watcher".into())
