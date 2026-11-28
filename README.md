@@ -12,6 +12,8 @@ YATS のトリガー検出は、プラットフォームで方式が異なりま
 
 Linux では、ThumbSense と同様にタッチパッドへの接触そのものを検出します。そのため、カーソルが止まっていても、指が触れている間（および指を離してから Release Delay の間）のキー押下でトリガーが発火します。検出は標準の evdev インターフェース経由なのでベンダーに依存せず、接触状態を evdev で取得できるタッチパッドであれば、Synaptics / ALPS 製でなくても動作します。パームリジェクションとして、接触面積による手のひら判定も行います。
 
+なお、Linux でも設定の「Trigger Detection」で検出方式を切り替えられます。「Movement (Any Device)」にすると、カーソルが動いてから Release Delay 以内のキー押下をトリガーとする従来方式になり、マウスやトラックポイントなどタッチパッド以外のポインティングデバイスでも使えます。「Auto (Both)」は接触検出と移動検出の併用です。
+
 Windows では、マウスカーソルが動いているかどうか（+止まってから一定時間の猶予）をトリガーとしています。そのため ThumbSense ほど精度の高いトリガー検出はできませんが、その代わり Synaptics/ALPS 以外のタッチパッドでも動作することができます。タッチパッドである必要すらないので、トラックポイントや [Nape Pro](https://www.gizmodo.jp/2025/11/gizmart-nape-pro.html) と組み合わせての操作も可能です（Precision Touchpad 搭載機種では、接触情報をパームリジェクションにも利用します）。
 
 ## プラットフォームによる違い
@@ -133,6 +135,8 @@ It was created as an alternative because ThumbSense no longer works properly on 
 How YATS detects triggers differs by platform.
 
 On Linux, like ThumbSense, YATS detects actual contact with the touchpad. A key press therefore triggers while your finger is touching (and for the Release Delay after you lift it), even when the cursor is perfectly still. Detection goes through the standard evdev interface, so it is vendor-independent: any touchpad that exposes its contact state via evdev works, not just Synaptics/ALPS ones. Contacts are also classified by size for palm rejection.
+
+On Linux you can also switch the detection method in the "Trigger Detection" setting. "Movement (Any Device)" uses the traditional method — a key press within the Release Delay after the cursor moved — which works with any pointing device such as a mouse or a TrackPoint. "Auto (Both)" combines contact and movement detection.
 
 On Windows, YATS uses mouse cursor movement (plus a certain delay after it stops) as a trigger. Therefore, it cannot detect triggers with as much precision as ThumbSense, but it can work with touchpads other than Synaptics/ALPS. Since it doesn't even need to be a touchpad, it can also be used in combination with a TrackPoint or [Nape Pro](https://www.gizmodo.jp/2025/11/gizmart-nape-pro.html). (On machines with a Precision Touchpad, contact information is also used for palm rejection.)
 

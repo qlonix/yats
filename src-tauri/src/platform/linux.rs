@@ -202,6 +202,31 @@ pub fn clear_scroll_route() {
 
 /// ポインタ配下のクライアントウィンドウの WM_CLASS を小文字で返す
 /// （インスタンス名とクラス名の連結）。取得できなければ None。
+/// 現在のポインタ位置（ルートウィンドウ座標）。移動検出モードの監視用。
+/// X 接続は使い回し、失敗したら次回に再接続する。
+pub fn pointer_position() -> Option<(i32, i32)> {
+    use std::sync::OnceLock;
+    static CONN: OnceLock<Mutex<Option<(RustConnection, usize)>>> = OnceLock::new();
+    let cell = CONN.get_or_init(|| Mutex::new(None));
+    let mut guard = crate::lock_unpoison(cell);
+    if guard.is_none() {
+        *guard = RustConnection::connect(None).ok();
+    }
+    let result = guard.as_ref().and_then(|(conn, screen_num)| {
+        let root = conn.setup().roots[*screen_num].root;
+        conn.query_pointer(root)
+            .ok()?
+            .reply()
+            .ok()
+            .map(|r| (i32::from(r.root_x), i32::from(r.root_y)))
+    });
+    if result.is_none() {
+        // 接続が切れていたら捨てて、次回に再接続する
+        *guard = None;
+    }
+    result
+}
+
 fn window_class_under_pointer() -> Option<String> {
     let (conn, screen_num) = RustConnection::connect(None).ok()?;
     let screen = conn.setup().roots.get(screen_num)?;

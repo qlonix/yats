@@ -63,6 +63,16 @@ fn start_audit_worker() {
     });
 }
 
+/// 設定の検出方式文字列をモニタ側の数値表現に変換する（Linux のみ使用）。
+#[cfg(target_os = "linux")]
+fn trigger_mode_value(s: &str) -> u8 {
+    match s {
+        "movement" => 1,
+        "auto" => 2,
+        _ => 0,
+    }
+}
+
 #[tauri::command]
 fn get_config(config: tauri::State<'_, Arc<RwLock<AppConfig>>>) -> AppConfig {
     read_unpoison(&config).clone()
@@ -88,6 +98,11 @@ fn set_config(
         .state
         .release_delay_ms
         .store(new_config.release_delay_ms as u32, Ordering::SeqCst);
+    #[cfg(target_os = "linux")]
+    monitor.state.trigger_mode.store(
+        trigger_mode_value(&new_config.trigger_detection),
+        Ordering::SeqCst,
+    );
 
     new_config.save(&app).map_err(|e| e.to_string())
 }
@@ -284,6 +299,11 @@ pub fn run() {
                 .state
                 .release_delay_ms
                 .store(loaded_config.release_delay_ms as u32, Ordering::SeqCst);
+            #[cfg(target_os = "linux")]
+            monitor_clone.state.trigger_mode.store(
+                trigger_mode_value(&loaded_config.trigger_detection),
+                Ordering::SeqCst,
+            );
 
             *lock_unpoison(&shared_handle) = Some(app.handle().clone());
 

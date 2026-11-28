@@ -1,7 +1,7 @@
 use crate::platform::touchpad;
 use crate::{audit_log, lock_unpoison};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 
@@ -16,6 +16,11 @@ pub struct MonitorState {
     pub x_delta: AtomicI32,
     pub y_delta: AtomicI32,
     pub release_delay_ms: AtomicU32,
+    /// トリガー検出方式（Linux）: 0=接触検出, 1=移動検出, 2=自動（両方）
+    pub trigger_mode: AtomicU8,
+    /// 移動検出: 最後にポインタの移動を観測した時刻
+    pub last_movement_time: Mutex<std::time::Instant>,
+    pub movement_seen: AtomicBool,
     pub app_handle: Arc<Mutex<Option<AppHandle>>>,
     #[cfg(target_os = "windows")]
     pub hwnd: Mutex<Option<SendHwnd>>,
@@ -44,6 +49,9 @@ impl TouchpadMonitor {
             x_delta: AtomicI32::new(0),
             y_delta: AtomicI32::new(0),
             release_delay_ms: AtomicU32::new(150),
+            trigger_mode: AtomicU8::new(0),
+            last_movement_time: Mutex::new(std::time::Instant::now()),
+            movement_seen: AtomicBool::new(false),
             app_handle,
             #[cfg(target_os = "windows")]
             hwnd: Mutex::new(None),
@@ -138,6 +146,33 @@ impl TouchpadMonitor {
             })
             .expect("Failed to spawn monitor watcher thread");
 
+        // 移動検出用にポインタ位置を監視する（Linux のみ）。
+        // 接触検出モードでは何もしない。
+        #[cfg(target_os = "linux")]
+        {
+            let state_poll = Arc::clone(&state);
+            std::thread::Builder::new()
+                .name("pointer-poller".into())
+                .spawn(move || {
+                    let mut last_pos: Option<(i32, i32)> = None;
+                    loop {
+                        std::thread::sleep(std::time::Duration::from_millis(20));
+                        if state_poll.trigger_mode.load(Ordering::SeqCst) == 0 {
+                            continue;
+                        }
+                        if let Some(pos) = crate::platform::pointer_position() {
+                            if last_pos != Some(pos) {
+                                last_pos = Some(pos);
+                                *lock_unpoison(&state_poll.last_movement_time) =
+                                    std::time::Instant::now();
+                                state_poll.movement_seen.store(true, Ordering::SeqCst);
+                            }
+                        }
+                    }
+                })
+                .ok();
+        }
+
         Self { state }
     }
 
@@ -162,7 +197,25 @@ impl TouchpadMonitor {
     }
 
     pub fn is_touched(&self) -> bool {
-        self.state.is_touched.load(Ordering::SeqCst)
+        match self.state.trigger_mode.load(Ordering::SeqCst) {
+            // 移動検出: ポインタが動いてから Release Delay 以内
+            1 => self.movement_recent(),
+            // 自動: 接触検出と移動検出のどちらか
+            2 => self.state.is_touched.load(Ordering::SeqCst) || self.movement_recent(),
+            // 接触検出
+            _ => self.state.is_touched.load(Ordering::SeqCst),
+        }
+    }
+
+    fn movement_recent(&self) -> bool {
+        if !self.state.movement_seen.load(Ordering::SeqCst) {
+            return false;
+        }
+        let delay = self.state.release_delay_ms.load(Ordering::SeqCst) as u128;
+        lock_unpoison(&self.state.last_movement_time)
+            .elapsed()
+            .as_millis()
+            <= delay
     }
 
     /// 現在の接触が始まった時刻。接触がなければ None。
