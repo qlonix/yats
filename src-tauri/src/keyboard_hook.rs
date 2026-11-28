@@ -1,7 +1,7 @@
 use crate::config::{Action, AppConfig, ScrollConfig, WindowAction};
 use crate::touchpad_monitor::TouchpadMonitor;
 use crate::{lock_unpoison, platform, read_unpoison};
-use rdev::{simulate, EventType};
+use rdev::{simulate, EventType, Key};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex, RwLock};
@@ -447,7 +447,12 @@ impl KeyboardHook {
                             }
 
                             let now = std::time::Instant::now();
-                            let palm_reason = {
+                            let is_modifier = is_modifier_key(&key);
+                            // 修飾キーは文字入力ではなく操作の準備。
+                            // 入力扱いすると Ctrl+クリックなどがパームリジェクションで弾かれる。
+                            let palm_reason = if is_modifier {
+                                None
+                            } else {
                                 let cfg = read_unpoison(&config_inner);
                                 if cfg.palm_rejection
                                     && lock_unpoison(&typing_mode_inner).on_press(
@@ -508,14 +513,18 @@ impl KeyboardHook {
                                         ));
                                     }
                                 }
-                                *lock_unpoison(&last_typing_inner) = Some(now);
+                                if !is_modifier {
+                                    *lock_unpoison(&last_typing_inner) = Some(now);
+                                }
                             }
                         }
                         rdev::EventType::KeyRelease(key) => {
                             let mut keys = lock_unpoison(&pressed_keys);
                             if !keys.remove(&key) {
-                                *lock_unpoison(&last_typing_inner) =
-                                    Some(std::time::Instant::now());
+                                if !is_modifier_key(&key) {
+                                    *lock_unpoison(&last_typing_inner) =
+                                        Some(std::time::Instant::now());
+                                }
                                 return Some(event);
                             }
 
@@ -685,7 +694,12 @@ impl KeyboardHook {
                                             1 => {
                                                 // Press
                                                 let now = std::time::Instant::now();
-                                                let palm_reason = {
+                                                let is_modifier = is_modifier_key(&rkey);
+                                                // 修飾キーは文字入力ではなく操作の準備。
+                                                // 入力扱いすると Ctrl+クリックなどがパームリジェクションで弾かれる。
+                                                let palm_reason = if is_modifier {
+                                                    None
+                                                } else {
                                                     let cfg = read_unpoison(&config_inner);
                                                     if cfg.palm_rejection
                                                         && lock_unpoison(&typing_mode_inner)
@@ -775,7 +789,9 @@ impl KeyboardHook {
                                                             ));
                                                         }
                                                     }
-                                                    *lock_unpoison(&last_typing_inner) = Some(now);
+                                                    if !is_modifier {
+                                                        *lock_unpoison(&last_typing_inner) = Some(now);
+                                                    }
                                                 }
                                             }
                                             0 => {
@@ -801,7 +817,7 @@ impl KeyboardHook {
                                                     }
                                                     // Consume event (do not pass through)
                                                     continue;
-                                                } else {
+                                                } else if !is_modifier_key(&rkey) {
                                                     *lock_unpoison(&last_typing_inner) =
                                                         Some(std::time::Instant::now());
                                                 }
@@ -811,7 +827,7 @@ impl KeyboardHook {
                                                 if pressed_keys.contains_key(&rkey) {
                                                     // Consume event (do not pass through)
                                                     continue;
-                                                } else {
+                                                } else if !is_modifier_key(&rkey) {
                                                     *lock_unpoison(&last_typing_inner) =
                                                         Some(std::time::Instant::now());
                                                 }
@@ -836,6 +852,20 @@ impl KeyboardHook {
             }
         }
     }
+}
+
+fn is_modifier_key(key: &Key) -> bool {
+    matches!(
+        key,
+        Key::ControlLeft
+            | Key::ControlRight
+            | Key::ShiftLeft
+            | Key::ShiftRight
+            | Key::Alt
+            | Key::AltGr
+            | Key::MetaLeft
+            | Key::MetaRight
+    )
 }
 
 /// パームリジェクションで抑止する場合はその理由を返す（抑止しない場合は None）。
