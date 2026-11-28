@@ -63,7 +63,10 @@ fn start_audit_worker() {
     });
 }
 
-/// 設定の検出方式文字列をモニタ側の数値表現に変換する（Linux のみ使用）。
+/// 設定の検出方式文字列をモニタ側の数値表現に変換する
+/// （0=接触検出, 1=移動検出, 2=自動）。未設定（""）の場合の既定は
+/// プラットフォームで異なる: Linux は接触検出、Windows は移動検出
+/// （どちらも従来の挙動）。
 #[cfg(target_os = "linux")]
 fn trigger_mode_value(s: &str) -> u8 {
     match s {
@@ -71,6 +74,20 @@ fn trigger_mode_value(s: &str) -> u8 {
         "auto" => 2,
         _ => 0,
     }
+}
+
+#[cfg(target_os = "windows")]
+fn trigger_mode_value(s: &str) -> u8 {
+    match s {
+        "contact" => 0,
+        "auto" => 2,
+        _ => 1,
+    }
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
+fn trigger_mode_value(_s: &str) -> u8 {
+    0
 }
 
 #[tauri::command]
@@ -98,7 +115,6 @@ fn set_config(
         .state
         .release_delay_ms
         .store(new_config.release_delay_ms as u32, Ordering::SeqCst);
-    #[cfg(target_os = "linux")]
     monitor.state.trigger_mode.store(
         trigger_mode_value(&new_config.trigger_detection),
         Ordering::SeqCst,
@@ -299,7 +315,6 @@ pub fn run() {
                 .state
                 .release_delay_ms
                 .store(loaded_config.release_delay_ms as u32, Ordering::SeqCst);
-            #[cfg(target_os = "linux")]
             monitor_clone.state.trigger_mode.store(
                 trigger_mode_value(&loaded_config.trigger_detection),
                 Ordering::SeqCst,

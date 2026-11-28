@@ -455,7 +455,7 @@ function App() {
   const [mappings, setMappings] = useState({});
   const [isTouched, setIsTouched] = useState(false);
   const [releaseDelay, setReleaseDelay] = useState(100);
-  const [triggerDetection, setTriggerDetection] = useState("contact");
+  const [triggerDetection, setTriggerDetection] = useState("");
   const isWindows = navigator.userAgent.includes("Windows");
   const [showAbout, setShowAbout] = useState(false);
   const [appVersion, setAppVersion] = useState("1.3.7");
@@ -620,7 +620,7 @@ function App() {
       });
       setMappings(normalized);
       setReleaseDelay(config.release_delay_ms || 200);
-      setTriggerDetection(config.trigger_detection || "contact");
+      setTriggerDetection(config.trigger_detection || "");
       setScrollSensitivity(config.scroll_sensitivity ?? 1);
       setScrollSpeed(config.scroll_speed ?? 25);
       setScrollInvert(config.scroll_invert ?? true);
@@ -924,23 +924,21 @@ function App() {
                 }}
               />
             </label>
-            {!isWindows && (
-              <label className="header-control-item">
-                Trigger Detection:
-                <select
-                  value={triggerDetection}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setTriggerDetection(val);
-                    saveConfigWithLatest({ triggerDetection: val });
-                  }}
-                >
-                  <option value="contact">Contact (Touchpad)</option>
-                  <option value="movement">Movement (Any Device)</option>
-                  <option value="auto">Auto (Both)</option>
-                </select>
-              </label>
-            )}
+            <label className="header-control-item">
+              Trigger Detection:
+              <select
+                value={triggerDetection || (isWindows ? "movement" : "contact")}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setTriggerDetection(val);
+                  saveConfigWithLatest({ triggerDetection: val });
+                }}
+              >
+                <option value="contact">Contact (Touchpad)</option>
+                <option value="movement">Movement (Any Device)</option>
+                <option value="auto">Auto (Both)</option>
+              </select>
+            </label>
             <label className="header-control-item">
               <input
                 type="checkbox"

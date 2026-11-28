@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **日本語**
 
 ### Added
-- Linux でトリガー検出方式を設定から切り替えられるようにした（Trigger Detection）。「Contact (Touchpad)」は従来どおり接触検出、「Movement (Any Device)」はカーソルが動いてから Release Delay 以内のキー押下をトリガーとする方式で、マウスやトラックポイントなどタッチパッド以外のポインティングデバイスでも使える。「Auto (Both)」は両方の併用
+- トリガー検出方式を設定から切り替えられるようにした（Trigger Detection、Windows / Linux 共通）。「Contact (Touchpad)」は接触検出、「Movement (Any Device)」はカーソルが動いてから Release Delay 以内のキー押下をトリガーとする方式で、マウスやトラックポイントなどタッチパッド以外のポインティングデバイスでも使える。「Auto (Both)」は両方の併用。Windows の Contact は Precision Touchpad が必要。未設定時の既定は従来どおり（Linux は接触検出、Windows は移動検出）
 
 ### Fixed
 - パームリジェクションに「タイピングモード」を追加。タッチパッドに触れながら一定時間タイプし続けると（間隔 1.5 秒以内の打鍵が 8 回以上、かつ 3 秒以上継続）、トリガーキーも通常のキーとして通すようになった。長文入力中の「考える間」で打鍵が数秒空いても、Palm Delay の時間切れで誤発火しなくなった。タイピング中の接触の細切れ（フリッカー）では解除されず、解除は「カーソルを大きく動かしてから押したとき」「接触が終わって打鍵も止んだとき」「10 秒間打鍵がないとき」に限られる。短いコマンド入力ではモードに入らない
@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **English**
 
 ### Added
-- On Linux, the trigger detection method can now be switched in the settings (Trigger Detection). "Contact (Touchpad)" is the existing contact detection; "Movement (Any Device)" triggers on a key press within the Release Delay after the cursor moved, and works with any pointing device such as a mouse or a TrackPoint; "Auto (Both)" combines the two
+- The trigger detection method can now be switched in the settings (Trigger Detection, on both Windows and Linux). "Contact (Touchpad)" is contact detection; "Movement (Any Device)" triggers on a key press within the Release Delay after the cursor moved, and works with any pointing device such as a mouse or a TrackPoint; "Auto (Both)" combines the two. On Windows, Contact requires a Precision Touchpad. When unset, the default is unchanged (contact detection on Linux, movement detection on Windows)
 
 ### Fixed
 - Added a "typing mode" to palm rejection. When you keep typing while touching the touchpad (8+ keystrokes no more than 1.5 s apart, sustained for at least 3 s), trigger keys are passed through as regular keys. Stray triggers no longer slip through thinking pauses of several seconds, which the time-based Palm Delay could not cover. Brief contact flicker during typing does not end the mode; it ends only when you press after a deliberate cursor move, when the contact ends and typing has stopped, or after 10 s without a keystroke. Short command input does not enter it

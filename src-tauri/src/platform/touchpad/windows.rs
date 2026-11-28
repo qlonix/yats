@@ -92,6 +92,9 @@ pub unsafe extern "system" fn wnd_proc(
                             let mut contacts = crate::lock_unpoison(&state.hid_contacts);
                             let any_active = contacts.values().any(|&a| a);
                             contacts.insert(device_id, true);
+                            state
+                                .contact_active
+                                .store(true, Ordering::SeqCst);
                             if !any_active {
                                 *crate::lock_unpoison(&state.contact_start_time) =
                                     Some(std::time::Instant::now());
@@ -100,7 +103,11 @@ pub unsafe extern "system" fn wnd_proc(
                         HidContact::Up => {
                             let mut contacts = crate::lock_unpoison(&state.hid_contacts);
                             contacts.insert(device_id, false);
-                            if !contacts.values().any(|&a| a) {
+                            let any_active = contacts.values().any(|&a| a);
+                            state
+                                .contact_active
+                                .store(any_active, Ordering::SeqCst);
+                            if !any_active {
                                 *crate::lock_unpoison(&state.contact_start_time) = None;
                             }
                         }

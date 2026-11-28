@@ -28,6 +28,9 @@ pub struct MonitorState {
     /// contact_start_time の開始・終了はこの遷移だけで管理する。
     #[cfg(target_os = "windows")]
     pub hid_contacts: Mutex<HashMap<usize, bool>>,
+    /// Windows: PTP の接触が1つでもアクティブかどうか（接触検出用）
+    #[cfg(target_os = "windows")]
+    pub contact_active: AtomicBool,
     pub device_activity: Mutex<HashMap<usize, u32>>,
     pub locked_device: Mutex<Option<usize>>,
 }
@@ -57,6 +60,8 @@ impl TouchpadMonitor {
             hwnd: Mutex::new(None),
             #[cfg(target_os = "windows")]
             hid_contacts: Mutex::new(HashMap::new()),
+            #[cfg(target_os = "windows")]
+            contact_active: AtomicBool::new(false),
             device_activity: Mutex::new(HashMap::new()),
             locked_device: Mutex::new(None),
         });
@@ -198,15 +203,40 @@ impl TouchpadMonitor {
 
     pub fn is_touched(&self) -> bool {
         match self.state.trigger_mode.load(Ordering::SeqCst) {
-            // 移動検出: ポインタが動いてから Release Delay 以内
-            1 => self.movement_recent(),
+            // 移動検出
+            1 => self.movement_state(),
             // 自動: 接触検出と移動検出のどちらか
-            2 => self.state.is_touched.load(Ordering::SeqCst) || self.movement_recent(),
+            2 => self.contact_state() || self.movement_state(),
             // 接触検出
-            _ => self.state.is_touched.load(Ordering::SeqCst),
+            _ => self.contact_state(),
         }
     }
 
+    /// 接触検出の状態。Linux は evdev モニタの接触フラグ、Windows は
+    /// PTP の接触状態（Confidence ありの接触が1つでもあるか）。
+    #[cfg(target_os = "linux")]
+    fn contact_state(&self) -> bool {
+        self.state.is_touched.load(Ordering::SeqCst)
+    }
+
+    #[cfg(target_os = "windows")]
+    fn contact_state(&self) -> bool {
+        self.state.contact_active.load(Ordering::SeqCst)
+    }
+
+    /// 移動検出の状態。Linux はポインタ位置の監視（Release Delay 以内）、
+    /// Windows は Raw Input のマウス活動で立てる従来のフラグ。
+    #[cfg(target_os = "linux")]
+    fn movement_state(&self) -> bool {
+        self.movement_recent()
+    }
+
+    #[cfg(target_os = "windows")]
+    fn movement_state(&self) -> bool {
+        self.state.is_touched.load(Ordering::SeqCst)
+    }
+
+    #[cfg(target_os = "linux")]
     fn movement_recent(&self) -> bool {
         if !self.state.movement_seen.load(Ordering::SeqCst) {
             return false;

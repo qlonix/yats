@@ -68,14 +68,15 @@ pub struct AppConfig {
     pub palm_rejection: bool,
     #[serde(default = "default_palm_rejection_delay")]
     pub palm_rejection_delay_ms: u64,
-    /// トリガー検出方式（Linux）: "contact"（接触検出）/
-    /// "movement"（移動検出）/ "auto"（両方）。Windows では不使用。
+    /// トリガー検出方式: "contact"（接触検出）/ "movement"（移動検出）/
+    /// "auto"（両方）。"" は未設定で、既定はプラットフォーム依存
+    /// （Linux は接触検出、Windows は移動検出 = どちらも従来の挙動）。
     #[serde(default = "default_trigger_detection")]
     pub trigger_detection: String,
 }
 
 fn default_trigger_detection() -> String {
-    "contact".to_string()
+    String::new()
 }
 
 fn default_sensitivity() -> u32 {
@@ -166,7 +167,7 @@ impl Default for AppConfig {
             linux_scroll_curve_is_default: true,
             palm_rejection: true,
             palm_rejection_delay_ms: 500,
-            trigger_detection: "contact".to_string(),
+            trigger_detection: String::new(),
         }
     }
 }
