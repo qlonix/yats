@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**日本語**
+
+### Fixed
+- Linux の接触検出で、タッチパッドに触れたまま指を静止させていると接触が切れてしまう問題を修正。静止した指は evdev イベントを出さないため、従来は Release Delay 経過後に接触が期限切れになっていた。接触状態をイベントの新しさではなく接触の有無そのもので判定するようにした
+
+**English**
+
+### Fixed
+- Fixed contact detection on Linux dropping the contact while a finger rests still on the touchpad. A still finger produces no evdev events, so the contact previously expired after the Release Delay. The contact state is now based on contact presence itself rather than event recency
+
 ## [1.4.1] - 2026-11-28
 
 **日本語**

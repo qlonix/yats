@@ -150,7 +150,12 @@ impl TouchpadMonitor {
                         let last_touch = lock_unpoison(&state_watch.last_touch_time);
                         let delay = state_watch.release_delay_ms.load(Ordering::SeqCst);
                         let elapsed = last_touch.elapsed();
-                        // 接触終了イベントを取りこぼした場合に備える。
+                        // 接触終了イベントを取りこぼした場合に備える
+                        // （Windows のみ。Linux は接触状態を
+                        // contact_start_time で判定するため、静止した指を
+                        // 時間切れで切らないようここでは消さない。
+                        // デバイス喪失時はモニタ側で消去する）。
+                        #[cfg(target_os = "windows")]
                         if elapsed >= std::time::Duration::from_secs(5) {
                             *lock_unpoison(&state_watch.contact_start_time) = None;
                         }
@@ -229,11 +234,14 @@ impl TouchpadMonitor {
         }
     }
 
-    /// 接触検出の状態。Linux は evdev モニタの接触フラグ、Windows は
-    /// PTP の接触状態（Confidence ありの接触が1つでもあるか）。
+    /// 接触検出の状態。Linux は接触の有無そのもの（contact_start_time）、
+    /// Windows は PTP の接触状態（Confidence ありの接触が1つでもあるか）。
+    /// Linux でイベントの新しさ（is_touched フラグ）を使うと、静止した
+    /// 指は evdev イベントを出さないため、watcher の期限切れで接触が
+    /// 切れてしまう。
     #[cfg(target_os = "linux")]
     fn contact_state(&self) -> bool {
-        self.state.is_touched.load(Ordering::SeqCst)
+        self.contact_started_at().is_some()
     }
 
     #[cfg(target_os = "windows")]

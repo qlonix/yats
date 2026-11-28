@@ -429,6 +429,13 @@ fn monitor_device(device: &mut Device, state: Arc<MonitorState>) {
             break; // Device disconnected
         }
     }
+
+    // デバイスを失った場合は接触状態を残さない（再スキャン後に、
+    // 触っていないのに接触中扱いになるのを防ぐ）
+    state.is_touched.store(false, Ordering::SeqCst);
+    if let Ok(mut start_time) = state.contact_start_time.lock() {
+        *start_time = None;
+    }
 }
 
 pub fn scan_and_register(_state: &MonitorState) {
