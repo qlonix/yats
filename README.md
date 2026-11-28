@@ -8,11 +8,25 @@
 
 最近の Windows では ThumbSense がまともに動作しなくなってしまったため、代替案として作成しました。
 
-YATS のトリガー検出には「接触検出」と「移動検出」の2方式があり、Windows / Linux のどちらでも両方を使えます。設定の「Trigger Detection」で切り替えます（「Auto (Both)」は両方の併用）。既定は Linux が接触検出、Windows が移動検出です。Windows で接触検出を使うには Precision Touchpad が必要です。
+トリガー検出には「接触検出」と「移動検出」の2方式があります。詳しくは次の「トリガー検出」の章を参照してください。
 
-Linux の接触検出は、ThumbSense と同様にタッチパッドへの接触そのものを検出します。そのため、カーソルが止まっていても、指が触れている間（および指を離してから Release Delay の間）のキー押下でトリガーが発火します。検出は標準の evdev インターフェース経由なのでベンダーに依存せず、接触状態を evdev で取得できるタッチパッドであれば、Synaptics / ALPS 製でなくても動作します。パームリジェクションとして、接触面積による手のひら判定も行います。
+## トリガー検出
 
-Windows の移動検出は、マウスカーソルが動いているかどうか（+止まってから一定時間の猶予）をトリガーとします。精度では接触検出に及びませんが、その代わり Synaptics/ALPS 以外のタッチパッドでも動作することができます。タッチパッドである必要すらないので、トラックポイントや [Nape Pro](https://www.gizmodo.jp/2025/11/gizmart-nape-pro.html) と組み合わせての操作も可能です。Precision Touchpad 搭載機種では接触検出も選べ、接触情報はパームリジェクションにも利用します。
+YATS のトリガー検出には「接触検出」と「移動検出」の2方式があり、Windows / Linux のどちらでも両方を使えます。設定の「Trigger Detection」で切り替えます。既定は Linux が接触検出、Windows が移動検出です。
+
+### 接触検出 (Contact)
+
+タッチパッドへの接触そのものを検出します。カーソルが止まっていても、指が触れている間（および指を離してから Release Delay の間）のキー押下でトリガーが発火します。ThumbSense と同じ方式です。
+
+Linux では標準の evdev インターフェース経由で検出するのでベンダーに依存せず、接触状態を evdev で取得できるタッチパッドであれば、Synaptics / ALPS 製でなくても動作します。パームリジェクションとして、接触面積による手のひら判定も行います。Windows では Precision Touchpad 搭載機種でのみ使え、接触情報はパームリジェクションにも利用します。
+
+### 移動検出 (Movement)
+
+マウスカーソルが動いているかどうか（+止まってから Release Delay の猶予）をトリガーとします。精度では接触検出に及びませんが、タッチパッドである必要がなく、マウスやトラックポイント、[Nape Pro](https://www.gizmodo.jp/2025/11/gizmart-nape-pro.html) などあらゆるポインティングデバイスで使えます。Synaptics/ALPS 以外のタッチパッドでも動作します。
+
+### 自動 (Auto)
+
+接触検出と移動検出の併用です。その場で使える方で発火します。
 
 ## プラットフォームによる違い
 
@@ -132,11 +146,25 @@ This application is heavily inspired by [ThumbSense](https://www.sonycsl.co.jp/p
 
 It was created as an alternative because ThumbSense no longer works properly on modern Windows.
 
-YATS has two trigger detection methods — contact detection and movement detection — and both are available on both Windows and Linux. Switch between them in the "Trigger Detection" setting ("Auto (Both)" combines the two). The default is contact detection on Linux and movement detection on Windows. On Windows, contact detection requires a Precision Touchpad.
+YATS has two trigger detection methods, contact detection and movement detection. See the "Trigger Detection" section below for details.
 
-On Linux, contact detection, like ThumbSense, detects actual contact with the touchpad. A key press therefore triggers while your finger is touching (and for the Release Delay after you lift it), even when the cursor is perfectly still. Detection goes through the standard evdev interface, so it is vendor-independent: any touchpad that exposes its contact state via evdev works, not just Synaptics/ALPS ones. Contacts are also classified by size for palm rejection.
+## Trigger Detection
 
-On Windows, movement detection uses mouse cursor movement (plus a certain delay after it stops) as a trigger. It cannot match the precision of contact detection, but it can work with touchpads other than Synaptics/ALPS. Since it doesn't even need to be a touchpad, it can also be used in combination with a TrackPoint or [Nape Pro](https://www.gizmodo.jp/2025/11/gizmart-nape-pro.html). On machines with a Precision Touchpad, contact detection is also available, and contact information is used for palm rejection as well.
+YATS has two trigger detection methods — contact detection and movement detection — and both are available on both Windows and Linux. Switch between them in the "Trigger Detection" setting. The default is contact detection on Linux and movement detection on Windows.
+
+### Contact Detection (Contact)
+
+Detects actual contact with the touchpad. A key press triggers while your finger is touching (and for the Release Delay after you lift it), even when the cursor is perfectly still. This is the same method as ThumbSense.
+
+On Linux, detection goes through the standard evdev interface, so it is vendor-independent: any touchpad that exposes its contact state via evdev works, not just Synaptics/ALPS ones. Contacts are also classified by size for palm rejection. On Windows, contact detection is available only on machines with a Precision Touchpad, and contact information is used for palm rejection as well.
+
+### Movement Detection (Movement)
+
+Uses mouse cursor movement (plus the Release Delay after it stops) as a trigger. It cannot match the precision of contact detection, but it does not need a touchpad at all: it works with any pointing device, such as a mouse, a TrackPoint, or [Nape Pro](https://www.gizmodo.jp/2025/11/gizmart-nape-pro.html), and with touchpads other than Synaptics/ALPS.
+
+### Auto (Both)
+
+Combines contact and movement detection; whichever applies fires the trigger.
 
 ## Platform Differences
 
